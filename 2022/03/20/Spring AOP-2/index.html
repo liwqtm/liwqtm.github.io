@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 6.2.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css" integrity="sha256-DfWjNxDkM94fVBWx1H5BMMp0Zq7luBlV8QRcSES7s+0=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"example.com","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.11.1","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12},"copycode":{"enable":false,"style":null},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="本次会将剩下的AOP 内容全部聊一下，其实就是剩一个请求调用全流程了，后续Spring 系列文章就还剩boot 和cloud 呢，boot 在我面试前应该还能讲一讲，但是cloud 因为这些年一直在保险行业混，现在也不是很清楚，分布式现在能记住的就是dubbo 体系的了，这个只能后面再说了，如果面试这个必须上的话，我就再看看cloud 然后整理一下相应文章，不行的话，只能等面试结束了，不过今年应该">
+<meta property="og:type" content="article">
+<meta property="og:title" content="AOP流程源码分析-请求调用全流程">
+<meta property="og:url" content="http://example.com/2022/03/20/Spring%20AOP-2/index.html">
+<meta property="og:site_name" content="茯楚博客">
+<meta property="og:description" content="本次会将剩下的AOP 内容全部聊一下，其实就是剩一个请求调用全流程了，后续Spring 系列文章就还剩boot 和cloud 呢，boot 在我面试前应该还能讲一讲，但是cloud 因为这些年一直在保险行业混，现在也不是很清楚，分布式现在能记住的就是dubbo 体系的了，这个只能后面再说了，如果面试这个必须上的话，我就再看看cloud 然后整理一下相应文章，不行的话，只能等面试结束了，不过今年应该">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/04/28/21:57:46-image-20220428215745492.png">
+<meta property="article:published_time" content="2022-03-19T16:00:00.000Z">
+<meta property="article:modified_time" content="2022-05-09T08:37:44.459Z">
+<meta property="article:author" content="李万青">
+<meta property="article:tag" content="框架">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="Spring">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/04/28/21:57:46-image-20220428215745492.png">
+
+
+<link rel="canonical" href="http://example.com/2022/03/20/Spring%20AOP-2/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://example.com/2022/03/20/Spring%20AOP-2/","path":"2022/03/20/Spring AOP-2/","title":"AOP流程源码分析-请求调用全流程"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>AOP流程源码分析-请求调用全流程 | 茯楚博客</title>
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">茯楚博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">记录整理技术文章</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90"><span class="nav-number">1.</span> <span class="nav-text">源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8B%A6%E6%88%AA%E5%99%A8%E9%93%BE%E3%80%81%E8%A2%AB%E4%BB%A3%E7%90%86%E5%AF%B9%E8%B1%A1%E5%AE%9E%E4%BE%8B%E3%80%81%E6%89%A7%E8%A1%8C%E5%99%A8%E7%9A%84%E8%8E%B7%E5%8F%96%E4%B8%8E%E6%9E%84%E5%BB%BA-invoke%E6%96%B9%E6%B3%95"><span class="nav-number">1.1.</span> <span class="nav-text">拦截器链、被代理对象实例、执行器的获取与构建-invoke方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%B0%83%E7%94%A8%E6%8B%A6%E6%88%AA%E5%99%A8%E5%92%8C%E6%89%A7%E8%A1%8C%E8%A2%AB%E8%B0%83%E7%94%A8%E5%AF%B9%E8%B1%A1%E7%9A%84%E6%96%B9%E6%B3%95-proceed%E6%96%B9%E6%B3%95"><span class="nav-number">1.2.</span> <span class="nav-text">调用拦截器和执行被调用对象的方法-proceed方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%8E%AF%E7%BB%95%E6%8B%A6%E6%88%AA%E5%99%A8%EF%BC%9AAspectJAroundAdvice%E5%AF%B9%E8%B1%A1"><span class="nav-number">1.3.</span> <span class="nav-text">环绕拦截器：AspectJAroundAdvice对象</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%89%8D%E7%BD%AE%E6%8B%A6%E6%88%AA%E5%99%A8%EF%BC%9AMethodBeforeAdviceInterceptor%E5%AF%B9%E8%B1%A1"><span class="nav-number">1.4.</span> <span class="nav-text">前置拦截器：MethodBeforeAdviceInterceptor对象</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%90%8E%E7%BD%AE%E6%8B%A6%E6%88%AA%E5%99%A8%EF%BC%9AAspectJAfterAdvice%E5%AF%B9%E8%B1%A1"><span class="nav-number">1.5.</span> <span class="nav-text">后置拦截器：AspectJAfterAdvice对象</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B5%81%E7%A8%8B%E5%B0%8F%E7%BB%93"><span class="nav-number">1.6.</span> <span class="nav-text">流程小结</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">2.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%99%84%E5%BD%95Spring-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E7%B3%BB%E5%88%97%E6%96%87%E7%AB%A0"><span class="nav-number">3.</span> <span class="nav-text">附录Spring 源码分析系列文章</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#IOC"><span class="nav-number">3.1.</span> <span class="nav-text">IOC</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#AOP"><span class="nav-number">3.2.</span> <span class="nav-text">AOP</span></a></li></ol></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="李万青"
+      src="/images/8a06cd0a8da6a6848b7a0b37b32164b7.jpeg">
+  <p class="site-author-name" itemprop="name">李万青</p>
+  <div class="site-description" itemprop="description">苦心人天不负</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">14</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/liwqtm/liwqtm.github.io" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;liwqtm&#x2F;liwqtm.github.io" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll site-overview-item animated">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/m0_51464746?type=blog" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;m0_51464746?type&#x3D;blog" rel="noopener" target="_blank">张怀猛的博客</a>
+        </li>
+    </ul>
+  </div>
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2022/03/20/Spring%20AOP-2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/8a06cd0a8da6a6848b7a0b37b32164b7.jpeg">
+      <meta itemprop="name" content="李万青">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="茯楚博客">
+      <meta itemprop="description" content="苦心人天不负">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="AOP流程源码分析-请求调用全流程 | 茯楚博客">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          AOP流程源码分析-请求调用全流程
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2022-03-20 00:00:00" itemprop="dateCreated datePublished" datetime="2022-03-20T00:00:00+08:00">2022-03-20</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-09 16:37:44" itemprop="dateModified" datetime="2022-05-09T16:37:44+08:00">2022-05-09</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Java%E6%A1%86%E6%9E%B6/" itemprop="url" rel="index"><span itemprop="name">Java框架</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Java%E6%A1%86%E6%9E%B6/Spring/" itemprop="url" rel="index"><span itemprop="name">Spring</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>本次会将剩下的AOP 内容全部聊一下，其实就是剩一个请求调用全流程了，后续Spring 系列文章就还剩boot 和cloud 呢，boot 在我面试前应该还能讲一讲，但是cloud 因为这些年一直在保险行业混，现在也不是很清楚，分布式现在能记住的就是dubbo 体系的了，这个只能后面再说了，如果面试这个必须上的话，我就再看看cloud 然后整理一下相应文章，不行的话，只能等面试结束了，不过今年应该能写完。<span id="more"></span></p>
+<h2 id="源码分析"><a href="#源码分析" class="headerlink" title="源码分析"></a>源码分析</h2><p>说了一些废话，现在就开始本次的源码分析了，老司机发车，坐稳。</p>
+<p>上篇aop 的文章讲了代理的创建（一共就两篇aop，不用我再把链接标出来吧）分为两种方式cglib 和jdk，我们一般情况下使用的还是jdk 创建的，cglib 在不熟悉的情况下，不建议使用。我们本次要讲的也是jdk 生成代理后，请求调用的全流程。</p>
+<p>首先要看到就是JdkDynamicAopProxy 对象，代理对象是需要继承了InvocationHandler 对象的，那么就一定会重写invoke 方法（后面关于dubbo 服务调用调用流程的时候也会讲到这个，这里要注意看下）当请求调用被代理对象的方法时，就会走到这个invoke 方法，所以我们直接跟进该方法。</p>
+<h3 id="拦截器链、被代理对象实例、执行器的获取与构建-invoke方法"><a href="#拦截器链、被代理对象实例、执行器的获取与构建-invoke方法" class="headerlink" title="拦截器链、被代理对象实例、执行器的获取与构建-invoke方法"></a>拦截器链、被代理对象实例、执行器的获取与构建-invoke方法</h3><p>跟进方法。</p>
+<p>首先这里会忽略一下method 是否为equals、hashCode 等Object 的方法，因为这些基本方法是不会被代理的。</p>
+<p>然后就是获取被代理对象的实例</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 2.拿到我们被代理的对象实例</span></span><br><span class="line">target = targetSource.getTarget();</span><br><span class="line">Class&lt;?&gt; targetClass = (target != <span class="literal">null</span> ? target.getClass() : <span class="literal">null</span>);</span><br></pre></td></tr></table></figure>
+
+<p>再然后就是获取我们之前解析出的拦截器链</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 【*】3.获取拦截器链：例如使用@Around注解时会找到AspectJAroundAdvice，还有ExposeInvocationInterceptor</span></span><br><span class="line">List&lt;Object&gt; chain = <span class="built_in">this</span>.advised.getInterceptorsAndDynamicInterceptionAdvice(method, targetClass);</span><br></pre></td></tr></table></figure>
+
+<p>到这里就不再关注其它的内容了，主要看拦截调用。</p>
+<p>这里首先构建一个ReflectiveMethodInvocation 对象，这里我理解是一个执行器对象，然后直接调用该对象的proceed 方法。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 6.如果存在拦截器，则创建一个ReflectiveMethodInvocation：代理对象、被代理对象、方法、参数、</span></span><br><span class="line"><span class="comment">// 被代理对象的Class、拦截器链作为参数创建ReflectiveMethodInvocation</span></span><br><span class="line"><span class="type">MethodInvocation</span> <span class="variable">invocation</span> <span class="operator">=</span></span><br><span class="line">  <span class="keyword">new</span> <span class="title class_">ReflectiveMethodInvocation</span>(proxy, target, method, args, targetClass, chain);</span><br><span class="line"><span class="comment">// Proceed to the joinpoint through the interceptor chain.</span></span><br><span class="line"><span class="comment">// 7.触发ReflectiveMethodInvocation的执行方法（逐一调用chain中的每一个拦截方法的proceed）</span></span><br><span class="line">retVal = invocation.proceed();</span><br></pre></td></tr></table></figure>
+
+<h3 id="调用拦截器和执行被调用对象的方法-proceed方法"><a href="#调用拦截器和执行被调用对象的方法-proceed方法" class="headerlink" title="调用拦截器和执行被调用对象的方法-proceed方法"></a>调用拦截器和执行被调用对象的方法-proceed方法</h3><p>跟进proceed 方法。</p>
+<p>然后就会看到一段很有意思的逻辑，这里我解释一下，这里的currentInterceptorIndex 属性的值是 -1，而和它对应的集合就是拦截器链，也就是advisors 的集合的大小 - 1，然后invokeJoinpoint 方法就是执行被代理对象真在被调用的方法。</p>
+<p>继续下面就是根据拦截器链中的下标索引获取具体的拦截器，记住这段代码执行完之后currentInterceptorIndex 属性的值就会 +1。这里先记住两点：1、当该属性值等于拦截器链大小的时候，就会执行被代理对象的正在调用的方法；2、只要获取了具体拦截器，currentInterceptorIndex 属性的值就会 +1。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 1.如果所有拦截器都执行完毕（index是从-1开始，所以跟size - 1比较），则直接使用反射调用连接点（也就是我们原本的方法）</span></span><br><span class="line"><span class="keyword">if</span> (<span class="built_in">this</span>.currentInterceptorIndex == <span class="built_in">this</span>.interceptorsAndDynamicMethodMatchers.size() - <span class="number">1</span>) &#123;</span><br><span class="line">  <span class="keyword">return</span> invokeJoinpoint();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 2.每次调用时，将索引的值递增，并通过索引拿到要执行的拦截器</span></span><br><span class="line"><span class="type">Object</span> <span class="variable">interceptorOrInterceptionAdvice</span> <span class="operator">=</span></span><br><span class="line">  <span class="built_in">this</span>.interceptorsAndDynamicMethodMatchers.get(++<span class="built_in">this</span>.currentInterceptorIndex);</span><br></pre></td></tr></table></figure>
+
+<p>然后我们接着往下看，直接看拦截器的调动。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">return</span> ((MethodInterceptor) interceptorOrInterceptionAdvice).invoke(<span class="built_in">this</span>);</span><br></pre></td></tr></table></figure>
+
+<p>目前我们的拦截器还是上篇文章中的配置，也就是三个拦截器，环绕、前置、后置，但是spring 会默认再给我们加一个最初的拦截器，这个我们暂时不用看。</p>
+<p><img src="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/04/28/21:57:46-image-20220428215745492.png" alt="image-20220428215745492"></p>
+<p>对了拦截器的顺序就是环绕、前置、后置，至于同级拦截器之前应该是看配置解析的顺序，先配置的先执行，但是后置相反，至于为什么，我们继续看代码。</p>
+<h3 id="环绕拦截器：AspectJAroundAdvice对象"><a href="#环绕拦截器：AspectJAroundAdvice对象" class="headerlink" title="环绕拦截器：AspectJAroundAdvice对象"></a>环绕拦截器：AspectJAroundAdvice对象</h3><p>我们现在直接跟到环绕拦截器对象：AspectJAroundAdvice 对象的invoke 方法里面。</p>
+<p>这里会先封装两个对象，然后直接调用invokeAdviceMethod 方法。这个方法很绕，但是目的就是为了调用我们之前编写好的环绕拦截的方法。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="keyword">public</span> Object <span class="title function_">invoke</span><span class="params">(MethodInvocation mi)</span> <span class="keyword">throws</span> Throwable &#123;</span><br><span class="line">  <span class="comment">// 1.这边的mi就是我们的ReflectiveMethodInvocation，</span></span><br><span class="line">  <span class="comment">// ReflectiveMethodInvocation实现了ProxyMethodInvocation接口，所以这边肯定通过校验</span></span><br><span class="line">  <span class="keyword">if</span> (!(mi <span class="keyword">instanceof</span> ProxyMethodInvocation)) &#123;</span><br><span class="line">    <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">IllegalStateException</span>(<span class="string">&quot;MethodInvocation is not a Spring ProxyMethodInvocation: &quot;</span> + mi);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">// 2.将mi直接强转成ProxyMethodInvocation，mi持有代理类实例proxy、被代理类实例target、被代理的方法method等</span></span><br><span class="line">  <span class="type">ProxyMethodInvocation</span> <span class="variable">pmi</span> <span class="operator">=</span> (ProxyMethodInvocation) mi;</span><br><span class="line">  <span class="comment">// 3.将pmi封装成MethodInvocationProceedingJoinPoint(直接持有入参mi，也就是ReflectiveMethodInvocation的引用)</span></span><br><span class="line">  <span class="type">ProceedingJoinPoint</span> <span class="variable">pjp</span> <span class="operator">=</span> lazyGetProceedingJoinPoint(pmi);</span><br><span class="line">  <span class="comment">// 4.拿到pointcut的表达式</span></span><br><span class="line">  <span class="type">JoinPointMatch</span> <span class="variable">jpm</span> <span class="operator">=</span> getJoinPointMatch(pmi);</span><br><span class="line">  <span class="comment">// 5.调用增强方法</span></span><br><span class="line">  <span class="keyword">return</span> invokeAdviceMethod(pjp, jpm, <span class="literal">null</span>, <span class="literal">null</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我们回到环绕拦截的方法，在这里会有一个入参ProceedingJoinPoint 对象，这个就是我们上面ReflectiveMethodInvocation 对象的封装，这里调用的proceed 方法跟我们上面的调用是一样的。</p>
+<p>这里就意味着目前环绕拦截没有执行完的情况下，又会回到proceed 方法中走下一个拦截器。注意如果没有这个调用，就没有后面所有拦截器的调用了。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Around(&quot;pointcut()&quot;)</span></span><br><span class="line"><span class="keyword">public</span> Object <span class="title function_">around</span><span class="params">(ProceedingJoinPoint proceedingJoinPoint)</span> <span class="keyword">throws</span> InterruptedException &#123;</span><br><span class="line">  System.out.println(<span class="string">&quot;around advice start&quot;</span>);</span><br><span class="line">  <span class="keyword">try</span> &#123;</span><br><span class="line">    <span class="type">Object</span> <span class="variable">result</span> <span class="operator">=</span> proceedingJoinPoint.proceed();</span><br><span class="line">    System.out.println(<span class="string">&quot;around advice end&quot;</span>);</span><br><span class="line">    <span class="keyword">return</span> result;</span><br><span class="line">  &#125; <span class="keyword">catch</span> (Throwable throwable) &#123;</span><br><span class="line">    throwable.printStackTrace();</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="前置拦截器：MethodBeforeAdviceInterceptor对象"><a href="#前置拦截器：MethodBeforeAdviceInterceptor对象" class="headerlink" title="前置拦截器：MethodBeforeAdviceInterceptor对象"></a>前置拦截器：MethodBeforeAdviceInterceptor对象</h3><p>然后我们再看看前置拦截器。</p>
+<p>前置拦截器：MethodBeforeAdviceInterceptor 对象，内容比较简单，就是执行我们之前对应编写的前置方法，然后继续回调proceed 方法，等于是又回到下个拦截器的调用。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="keyword">public</span> Object <span class="title function_">invoke</span><span class="params">(MethodInvocation mi)</span> <span class="keyword">throws</span> Throwable &#123;</span><br><span class="line">  <span class="built_in">this</span>.advice.before(mi.getMethod(), mi.getArguments(), mi.getThis());</span><br><span class="line">  <span class="keyword">return</span> mi.proceed();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="后置拦截器：AspectJAfterAdvice对象"><a href="#后置拦截器：AspectJAfterAdvice对象" class="headerlink" title="后置拦截器：AspectJAfterAdvice对象"></a>后置拦截器：AspectJAfterAdvice对象</h3><p>继续看后置拦截器：AspectJAfterAdvice 对象，这里同样简单，不过首先就是回到proceed 方法，当下一个拦截器调用成功之后，再执行自己的方法调用。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="keyword">public</span> Object <span class="title function_">invoke</span><span class="params">(MethodInvocation mi)</span> <span class="keyword">throws</span> Throwable &#123;</span><br><span class="line">  <span class="keyword">try</span> &#123;</span><br><span class="line">    <span class="keyword">return</span> mi.proceed();</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">finally</span> &#123;</span><br><span class="line">    invokeAdviceMethod(getJoinPointMatch(), <span class="literal">null</span>, <span class="literal">null</span>);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="流程小结"><a href="#流程小结" class="headerlink" title="流程小结"></a>流程小结</h3><p>现在整理一下流程首先是spring 提供的拦截器调用，当该拦截器执行完成之后，调用了proceed 方法，走下一个环绕拦截器，然后由环绕拦截，调用proceed 方法走到前置拦截器，再由前置拦截器调用proceed 方法走到后置拦截器。注意我这里的拦截器已经走完了，那么之前的currentInterceptorIndex 属性值现在就应该是3了，同时拦截器链的大小 -1 也是3，那么就会走上面说的invokeJoinpoint 方法，这样就走了被代理对象的正在调用的方法，同时注意调用完成之后，下面是获取不到拦截器了的，那么意味在后置拦截器调用的proceed 方法才走完，目前是后置拦截器中继续走，这样才会走后置拦截器的拦截方法。</p>
+<p>说了这么多，有点绕，所以简单一点描述：proceed 方法调用拦截器1（标识第一次调用，后续累计） -&gt; spring 默认拦截器 -&gt; proceed 方法调用拦截器2 -&gt; 环绕拦截器方法 -&gt; proceed 方法调用拦截器3 -&gt; 前置拦截器方法 -&gt; proceed 方法调用拦截器4 -&gt; 后置拦截器方法 -&gt; proceed 方法调用拦截器5 -&gt;注意这里已经没有拦截器了，所以走了invokeJoinpoint 方法。</p>
+<p>流程没有走完，还有回去：proceed 方法调用拦截器5 -&gt; 后置拦截器方法 -&gt; proceed 方法调用拦截器4 -&gt; 前置拦截器方法 -&gt; proceed 方法调用拦截器3 -&gt; 环绕拦截器方法 -&gt; proceed 方法调用拦截器2 -&gt; spring 默认拦截器 -&gt; proceed 方法调用拦截器1-&gt; 最后才是拦截器1的结束。</p>
+<p>这样我们就能知道为什么，后置拦截器，配置在前面的反而后执行，因为后置拦截器，没有先执行自己的拦截方法，而是调用了下一个拦截器，所以配置在最后的后置拦截器要比前面的后置拦截器，先执行。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>调用流程其实并不是很复杂，就是比较绕，看明白之后会发现这个还是比较有趣的，没有使用循环，但是也实现了循环的效果，而且更加高明，这就是任务链的设置模式。</p>
+<p>本次就在这里结束了，内容比之前要少很多，因为前面已经做好了全部的铺垫，这里很多都是引用，后续的spring 文章呢，看情况吧，下阶段还是要先看下jdk 的源码，这快的面试问题也不少，后续如果面试上了，我会将面试题在做一个系列，先这样。终点站到了，下车。</p>
+<h2 id="附录Spring-源码分析系列文章"><a href="#附录Spring-源码分析系列文章" class="headerlink" title="附录Spring 源码分析系列文章"></a>附录Spring 源码分析系列文章</h2><h3 id="IOC"><a href="#IOC" class="headerlink" title="IOC"></a>IOC</h3><table>
+<thead>
+<tr>
+<th align="left">时间</th>
+<th>文章</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">2022-03-09</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/09/Spring%20IOC-1/#more">Spring的基本概念和IOC流程的简述</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-11</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/11/Spring%20IOC-2/#more">IOC流程解析-BeanFactory的创建</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-14</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/14/Spring%20IOC-3/#more">IOC流程解析-BeanFactoyPostProcessor和BeanPostProcessor</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-15</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/15/Spring%20IOC-4/#more">IOC流程解析-实例化和初始化</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-17</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/17/Spring%20IOC-5/#more">IOC流程解析-循环依赖</a></td>
+</tr>
+</tbody></table>
+<h3 id="AOP"><a href="#AOP" class="headerlink" title="AOP"></a>AOP</h3><table>
+<thead>
+<tr>
+<th align="left">时间</th>
+<th>文章</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">2022-03-19</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/20/Spring%20AOP-1/#more">AOP流程源码分析-配置信息解析和代理对象创建</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-20</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/20/Spring%20AOP-2/#more">AOP流程源码分析-请求调用全流程</a></td>
+</tr>
+</tbody></table>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E6%A1%86%E6%9E%B6/" rel="tag"># 框架</a>
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/Spring/" rel="tag"># Spring</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2022/03/19/Spring%20AOP-1/" rel="prev" title="AOP流程源码分析-配置信息解析和代理对象创建">
+                  <i class="fa fa-chevron-left"></i> AOP流程源码分析-配置信息解析和代理对象创建
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2022/03/21/MyBatis-1/" rel="next" title="MyBatis架构及完成执行流程源码分析">
+                  MyBatis架构及完成执行流程源码分析 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">李万青</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/next-boot.js"></script>
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+</body>
+</html>

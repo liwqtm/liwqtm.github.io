@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 6.2.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css" integrity="sha256-DfWjNxDkM94fVBWx1H5BMMp0Zq7luBlV8QRcSES7s+0=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"example.com","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.11.1","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12},"copycode":{"enable":false,"style":null},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="本篇作为JDK 源码分析的第一篇，就先从简单的说起。本篇主要分析的就是Object、ArrayList 以及LinkedList 的源码，Object 主要就是简单介绍一下hashCode 的生成还有一些基本的概念，object 本身来说也并不是很复杂，面试的时候也不会问到太多，所以也就不多聊。剩下的ArrayList 和LinkedList 都是从数据结构、初始化、增删改查以及扩容流程来详谈。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Object、ArrayList以及LinkedList源码分析">
+<meta property="og:url" content="http://example.com/2022/04/25/JDK-1/index.html">
+<meta property="og:site_name" content="茯楚博客">
+<meta property="og:description" content="本篇作为JDK 源码分析的第一篇，就先从简单的说起。本篇主要分析的就是Object、ArrayList 以及LinkedList 的源码，Object 主要就是简单介绍一下hashCode 的生成还有一些基本的概念，object 本身来说也并不是很复杂，面试的时候也不会问到太多，所以也就不多聊。剩下的ArrayList 和LinkedList 都是从数据结构、初始化、增删改查以及扩容流程来详谈。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/05/02/10:17:56-image-20220502101754447.png">
+<meta property="og:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/05/02/10:56:46-image-20220502105645072.png">
+<meta property="og:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/05/03/10:48:55-image-20220503104854183.png">
+<meta property="article:published_time" content="2022-04-24T16:00:00.000Z">
+<meta property="article:modified_time" content="2022-05-09T07:22:04.598Z">
+<meta property="article:author" content="李万青">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="JDK">
+<meta property="article:tag" content="Object">
+<meta property="article:tag" content="ArrayList">
+<meta property="article:tag" content="LinkedList">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/05/02/10:17:56-image-20220502101754447.png">
+
+
+<link rel="canonical" href="http://example.com/2022/04/25/JDK-1/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://example.com/2022/04/25/JDK-1/","path":"2022/04/25/JDK-1/","title":"Object、ArrayList以及LinkedList源码分析"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Object、ArrayList以及LinkedList源码分析 | 茯楚博客</title>
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">茯楚博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">记录整理技术文章</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Object%E7%9A%84%E7%AE%80%E5%8D%95%E4%BB%8B%E7%BB%8D"><span class="nav-number">1.</span> <span class="nav-text">Object的简单介绍</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%8E%B7%E5%8F%96%E8%BF%90%E8%A1%8C%E6%97%B6%E7%B1%BB%E7%9A%84%E6%96%B9%E6%B3%95-getClass%E6%96%B9%E6%B3%95"><span class="nav-number">1.1.</span> <span class="nav-text">获取运行时类的方法-getClass方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%8E%B7%E5%8F%96hash%E7%A0%81%E7%9A%84%E6%96%B9%E6%B3%95-hashCode%E6%96%B9%E6%B3%95"><span class="nav-number">1.2.</span> <span class="nav-text">获取hash码的方法-hashCode方法</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%B0%E7%BB%84%E9%9B%86%E5%90%88-ArrayList"><span class="nav-number">2.</span> <span class="nav-text">数组集合-ArrayList</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%B1%BB%E6%9E%84%E9%80%A0%E5%99%A8-%E6%97%A0%E5%8F%82%E6%9E%84%E9%80%A0%E9%98%B2%E6%96%B9%E6%B3%95"><span class="nav-number">2.1.</span> <span class="nav-text">类构造器-无参构造防方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%AC%E4%B8%80%E6%AC%A1%E6%B7%BB%E5%8A%A0%E5%85%83%E7%B4%A0%E5%92%8C%E4%B9%8B%E5%90%8E%E6%B7%BB%E5%8A%A0%E5%85%83%E7%B4%A0-add%E6%96%B9%E6%B3%95"><span class="nav-number">2.2.</span> <span class="nav-text">第一次添加元素和之后添加元素-add方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%95%B0%E7%BB%84%E9%9B%86%E5%90%88%E6%89%A9%E5%AE%B9%E6%96%B9%E6%B3%95-grow%E6%96%B9%E6%B3%95"><span class="nav-number">2.3.</span> <span class="nav-text">数组集合扩容方法-grow方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%A0%E9%99%A4%E5%85%83%E7%B4%A0-remove%E6%96%B9%E6%B3%95"><span class="nav-number">2.4.</span> <span class="nav-text">删除元素-remove方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9F%A5%E8%AF%A2%E5%85%83%E7%B4%A0-get%E6%96%B9%E6%B3%95"><span class="nav-number">2.5.</span> <span class="nav-text">查询元素-get方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BF%AE%E6%94%B9%E6%96%B9%E6%B3%95-set%E6%96%B9%E6%B3%95"><span class="nav-number">2.6.</span> <span class="nav-text">修改方法-set方法</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%93%BE%E8%A1%A8%E9%9B%86%E5%90%88-LinkedList"><span class="nav-number">3.</span> <span class="nav-text">链表集合-LinkedList</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%B1%BB%E6%9E%84%E9%80%A0%E5%99%A8-%E6%97%A0%E5%8F%82%E6%9E%84%E9%80%A0"><span class="nav-number">3.1.</span> <span class="nav-text">类构造器-无参构造</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B7%BB%E5%8A%A0%E5%85%83%E7%B4%A0-add%E6%96%B9%E6%B3%95"><span class="nav-number">3.2.</span> <span class="nav-text">添加元素-add方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%A0%E9%99%A4%E5%85%83%E7%B4%A0-remove%E6%96%B9%E6%B3%95-1"><span class="nav-number">3.3.</span> <span class="nav-text">删除元素-remove方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9F%A5%E8%AF%A2%E5%85%83%E7%B4%A0-next%E6%96%B9%E6%B3%95"><span class="nav-number">3.4.</span> <span class="nav-text">查询元素-next方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BF%AE%E6%94%B9%E6%96%B9%E6%B3%95-set%E6%96%B9%E6%B3%95-1"><span class="nav-number">3.5.</span> <span class="nav-text">修改方法-set方法</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">4.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%99%84%E5%BD%95JDK-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E7%B3%BB%E5%88%97%E6%96%87%E7%AB%A0"><span class="nav-number">5.</span> <span class="nav-text">附录JDK 源码分析系列文章</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="李万青"
+      src="/images/8a06cd0a8da6a6848b7a0b37b32164b7.jpeg">
+  <p class="site-author-name" itemprop="name">李万青</p>
+  <div class="site-description" itemprop="description">苦心人天不负</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">14</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/liwqtm/liwqtm.github.io" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;liwqtm&#x2F;liwqtm.github.io" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll site-overview-item animated">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/m0_51464746?type=blog" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;m0_51464746?type&#x3D;blog" rel="noopener" target="_blank">张怀猛的博客</a>
+        </li>
+    </ul>
+  </div>
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2022/04/25/JDK-1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/8a06cd0a8da6a6848b7a0b37b32164b7.jpeg">
+      <meta itemprop="name" content="李万青">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="茯楚博客">
+      <meta itemprop="description" content="苦心人天不负">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Object、ArrayList以及LinkedList源码分析 | 茯楚博客">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Object、ArrayList以及LinkedList源码分析
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2022-04-25 00:00:00" itemprop="dateCreated datePublished" datetime="2022-04-25T00:00:00+08:00">2022-04-25</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-09 15:22:04" itemprop="dateModified" datetime="2022-05-09T15:22:04+08:00">2022-05-09</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Java%E5%9F%BA%E7%A1%80/" itemprop="url" rel="index"><span itemprop="name">Java基础</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Java%E5%9F%BA%E7%A1%80/JDK/" itemprop="url" rel="index"><span itemprop="name">JDK</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>本篇作为JDK 源码分析的第一篇，就先从简单的说起。本篇主要分析的就是Object、ArrayList 以及LinkedList 的源码，Object 主要就是简单介绍一下hashCode 的生成还有一些基本的概念，object 本身来说也并不是很复杂，面试的时候也不会问到太多，所以也就不多聊。剩下的ArrayList 和LinkedList 都是从数据结构、初始化、增删改查以及扩容流程来详谈。<span id="more"></span></p>
+<h2 id="Object的简单介绍"><a href="#Object的简单介绍" class="headerlink" title="Object的简单介绍"></a>Object的简单介绍</h2><p>基本上所有刚刚接触java 的萌新第一个知道的就是万物皆对象，然后就是Object，这也说明了object 在java中的地位，它作为所有类的基类，当一个类没有继承某个类时，默认继承的就是object。</p>
+<p>Object 类属于 java.lang 包，此包下的所有类在使用时无需手动导入，都是系统会在程序编译期间自动导入的。注意：JDK无论版本，都是由编译器在编译阶段就已经织入了Object。</p>
+<p>我们这里也可以先看下object 的类结构图。<img src="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/05/02/10:17:56-image-20220502101754447.png" alt="image-20220502101754447" style="zoom: 50%;" /></p>
+<p>可以看到这里会有很多的方法，我们常用的就是getClass、toString、equals 之类的，甚至toString、equals 之类方法平时使用还是String 重写过的，我们这里就分别介绍一下getClass 和hashCode 方法，其余的有兴趣的话可以自己了解，至于String 重写就比较简单也可以自己去看，这我只在刚刚入行的时候有人问过，属于入门小知识。</p>
+<h3 id="获取运行时类的方法-getClass方法"><a href="#获取运行时类的方法-getClass方法" class="headerlink" title="获取运行时类的方法-getClass方法"></a>获取运行时类的方法-getClass方法</h3><p>这个方法我们在框架中看到的比较多，上次聊Spring 框架的时候有很多地方都有通过getClass 方法获取到类对象，然后可以获取到所有方法、属性，进而可以对这些方法、属性进行操作，比如Bean 初始化和填充属性的时候就有使用。</p>
+<p>getClass 方法本身是被native 关键字修饰的常量方法，这里我们要知道用native 修饰的方法我们不用考虑，由操作系统帮我们实现，被native 修饰的方法表示告知JVM 调用，该方法在外部定义，我们可以用任何语言去实现它。简单地讲，一个native Method 就是一个Java 调用非Java 代码的接口。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">final</span> <span class="keyword">native</span> Class&lt;?&gt; getClass();</span><br></pre></td></tr></table></figure>
+
+<h3 id="获取hash码的方法-hashCode方法"><a href="#获取hash码的方法-hashCode方法" class="headerlink" title="获取hash码的方法-hashCode方法"></a>获取hash码的方法-hashCode方法</h3><p>hashCode 方法同样也是一个由native 修饰的常量方法，作用是返回对象的散列码，是int 类型的数值。在后面我们要说的HashMap 的key 值就是需要转换为hashCode 的。hashCode 的本质就是用来在散列存储结构中确定对象的存储地址。</p>
+<p>Java 的集合设计者就采用了<strong>哈希表</strong>来实现的。哈希算法也称为散列算法，是将数据依特定算法产生的结果直接指定到一个地址上。这个结果就是由hashCode 方法产生。这样一来，当集合要添加新的元素时，先调用这个元素的hashCode 方法，就一下子能定位到它应该放置的物理位置上。（这里提一句Redis 的设计同样也是这样，后面Redis 文章详谈）</p>
+<p>关于hashCode 的生成和存储，这里涉及到很多关于锁的知识点，这点我们后面关于并发线程的文章再说，我们这里说hashCode 生成的结论。</p>
+<ol>
+<li>hashCode 不是直接使用的内存地址，而是采取一定的算法来生成</li>
+<li>hashCode 值的存储在mark word里，与锁共用一段bit位，这就造成了跟锁状态相关性，如果是偏向锁：一旦调用hashcode，偏向锁将被撤销，hashcode被保存占位mark word，对象被打回无锁状态，如果这个时候该对象一定要使用锁，那么对象再也回不到偏向锁状态而是升级为重量级锁。hashCode 跟随mark word 被移动到c 的object monitor，从那里取。</li>
+</ol>
+<p>hashCode 的实现逻辑总结见下图，java 对hashCode 的生成可以通过参数 -XX: hashcode&#x3D;1进行修改 （JDK8默认使用最后一种）</p>
+<img src="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/05/02/10:56:46-image-20220502105645072.png" alt="image-20220502105645072"  />
+
+<h2 id="数组集合-ArrayList"><a href="#数组集合-ArrayList" class="headerlink" title="数组集合-ArrayList"></a>数组集合-ArrayList</h2><p>萌新都知道的一点：ArrayList 就是List 接口的实现类。那为什么它又被叫做数组集合呢，其原因就是它的数据结构本质上就是一个数组，我们使用的增删改查都通过的下标索引来进行的。分析这类对象，我们就从其构造方法开始。</p>
+<h3 id="类构造器-无参构造防方法"><a href="#类构造器-无参构造防方法" class="headerlink" title="类构造器-无参构造防方法"></a>类构造器-无参构造防方法</h3><p>在我们平常中使用集合中ArrayList 还是非常常见的，要了解它的构造，我们就可以先简单的创建一个ArrayList。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">List&lt;String&gt; list = <span class="keyword">new</span> <span class="title class_">ArrayList</span>&lt;&gt;();</span><br></pre></td></tr></table></figure>
+
+<p>简单的无参构造new 出来就行，这里我们可以跟进无参构造的方法看看。</p>
+<p>这里可以说是非常的简单，就是构建了一个空数组。注意：这里构造出的是空数组，也就说数组长度是0。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">transient</span> Object[] elementData;</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Object[] DEFAULTCAPACITY_EMPTY_ELEMENTDATA = &#123;&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="title function_">ArrayList</span><span class="params">()</span> &#123;</span><br><span class="line">  <span class="built_in">this</span>.elementData = DEFAULTCAPACITY_EMPTY_ELEMENTDATA;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="第一次添加元素和之后添加元素-add方法"><a href="#第一次添加元素和之后添加元素-add方法" class="headerlink" title="第一次添加元素和之后添加元素-add方法"></a>第一次添加元素和之后添加元素-add方法</h3><p>看标题，我这里是将第一次调用添加和后面再调用添加是分开了的，为什么呢，因为我们上面调用的无参构造生成的数据没有长度，一个数组没有长度的情况下，是不可能可以添加元素的，所以我们第一次调用要先完整构建出数组，然后在添加元素，后面再添加时就无须操作了。</p>
+<p>看代码，直接调用add 方法。</p>
+<p>这里首先就是调用ensureCapacityInternal 方法，然后再往elementData 数组中添加传入元素，并累加数组长度。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="type">int</span> size;</span><br><span class="line"></span><br><span class="line"><span class="keyword">transient</span> Object[] elementData; </span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="type">boolean</span> <span class="title function_">add</span><span class="params">(E e)</span> &#123;</span><br><span class="line">  ensureCapacityInternal(size + <span class="number">1</span>);  <span class="comment">// Increments modCount!!</span></span><br><span class="line">  elementData[size++] = e;</span><br><span class="line">  <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我们再看下ensureCapacityInternal  方法。</p>
+<p>这里要将两层方法调用都看下，先看calculateCapacity 方法。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title function_">ensureCapacityInternal</span><span class="params">(<span class="type">int</span> minCapacity)</span> &#123;</span><br><span class="line">  ensureExplicitCapacity(calculateCapacity(elementData, minCapacity));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>先判断传入数组是不是刚刚无参构造生成的数据，是则将当前长度（我们第一次添加，这里传入的是1）和10对比，取最大返回，否则返回当前长度。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="type">int</span> <span class="variable">DEFAULT_CAPACITY</span> <span class="operator">=</span> <span class="number">10</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span> <span class="keyword">static</span> <span class="type">int</span> <span class="title function_">calculateCapacity</span><span class="params">(Object[] elementData, <span class="type">int</span> minCapacity)</span> &#123;</span><br><span class="line">  <span class="keyword">if</span> (elementData == DEFAULTCAPACITY_EMPTY_ELEMENTDATA) &#123;</span><br><span class="line">    <span class="keyword">return</span> Math.max(DEFAULT_CAPACITY, minCapacity);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> minCapacity;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>继续看ensureExplicitCapacity 方法。</p>
+<p>这里先是累加一个modCount 变量，然后判断当前长度是否大于集合长度，是则表示数组需要扩容，然后直接跳过，回到add 方法继续添加步骤。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title function_">ensureExplicitCapacity</span><span class="params">(<span class="type">int</span> minCapacity)</span> &#123;</span><br><span class="line">  modCount++;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// overflow-conscious code</span></span><br><span class="line">  <span class="keyword">if</span> (minCapacity - elementData.length &gt; <span class="number">0</span>)</span><br><span class="line">    grow(minCapacity);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="数组集合扩容方法-grow方法"><a href="#数组集合扩容方法-grow方法" class="headerlink" title="数组集合扩容方法-grow方法"></a>数组集合扩容方法-grow方法</h3><p>继续看grow 扩容方法。</p>
+<p>这里有一些算法，乍一看还是比较模糊，我们以数字带入看，</p>
+<ol>
+<li>首先目前传入的是10，</li>
+<li>然后获取当前数组长度并赋值给oldCapacity &#x3D; 0，</li>
+<li>newCapacity &#x3D; 0 + (0 &gt;&gt; 1) 这里是右移一位还是等于0，</li>
+<li>0 - 10 &lt; 0，所以这里进第一个判断newCapacity &#x3D; 10，</li>
+<li>第二个判断一般都是不会进的，这里是判断是否超过最大长度，</li>
+<li>最后进入Arrays.copyOf 调用，这里就可以不用再跟了，这就是创建一个数组，并将原数组中的元素转移到新数组中。</li>
+</ol>
+<p>这里右移不知道怎么算的，可以先将被右移数转为二进制码，然后左边添加一个0，删除最右边的数组，比如：4，二进制为100，右移一位是010，也就是10，再将二进制转为十进制就是2。至于上面的0右移一位，0的二进制就是，再怎么右移还是0。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title function_">grow</span><span class="params">(<span class="type">int</span> minCapacity)</span> &#123;</span><br><span class="line">  <span class="comment">// overflow-conscious code</span></span><br><span class="line">  <span class="type">int</span> <span class="variable">oldCapacity</span> <span class="operator">=</span> elementData.length;</span><br><span class="line">  <span class="type">int</span> <span class="variable">newCapacity</span> <span class="operator">=</span> oldCapacity + (oldCapacity &gt;&gt; <span class="number">1</span>);</span><br><span class="line">  <span class="keyword">if</span> (newCapacity - minCapacity &lt; <span class="number">0</span>)</span><br><span class="line">    newCapacity = minCapacity;</span><br><span class="line">  <span class="keyword">if</span> (newCapacity - MAX_ARRAY_SIZE &gt; <span class="number">0</span>)</span><br><span class="line">    newCapacity = hugeCapacity(minCapacity);</span><br><span class="line">  <span class="comment">// minCapacity is usually close to size, so this is a win:</span></span><br><span class="line">  elementData = Arrays.copyOf(elementData, newCapacity);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>小结一下：arrayList 的元素添加就是需要先扩容再添加。扩容的算法是根据当前数组长度累加其右移一位后的数字，数组无参构造的初始长度是10，那么第一次扩容后的长度就是15，第二次扩容就是22，后面就是以此类推。</p>
+<h3 id="删除元素-remove方法"><a href="#删除元素-remove方法" class="headerlink" title="删除元素-remove方法"></a>删除元素-remove方法</h3><p>删除元素实现也同样简单，根据下标索引就能实现，直接传入一个下标索引即可。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">list1.remove(<span class="number">3</span>);</span><br></pre></td></tr></table></figure>
+
+<p>我们来跟一下具体的remove 方法。</p>
+<p>首先是rangeCheck 方法用于判断当前下标是否存在，然后通过elementData 获取到具体的元素对象，判断当前删除元素的下标索引是否是最后一个，否则进判断将当前元素后面的所有元素前移，比如1-10元素中删除2元素，那么走完这步后数组的元素应该是1、3-10、10，也就是说数组长度不变，但是将2元素进行了替换，数组最后一个元素不变，其余元素前移，然后将数组最后一位置空。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> E <span class="title function_">remove</span><span class="params">(<span class="type">int</span> index)</span> &#123;</span><br><span class="line">  rangeCheck(index);</span><br><span class="line"></span><br><span class="line">  modCount++;</span><br><span class="line">  <span class="type">E</span> <span class="variable">oldValue</span> <span class="operator">=</span> elementData(index);</span><br><span class="line"></span><br><span class="line">  <span class="type">int</span> <span class="variable">numMoved</span> <span class="operator">=</span> size - index - <span class="number">1</span>;</span><br><span class="line">  <span class="keyword">if</span> (numMoved &gt; <span class="number">0</span>)</span><br><span class="line">    System.arraycopy(elementData, index+<span class="number">1</span>, elementData, index,</span><br><span class="line">                     numMoved);</span><br><span class="line">  elementData[--size] = <span class="literal">null</span>; <span class="comment">// clear to let GC do its work</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> oldValue;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>上面方法要看的其实就是一个如何获取元素对象，也就是查询，至于第一步的rangeCheck 方法，就是我们最常见的索引越界异常。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title function_">rangeCheck</span><span class="params">(<span class="type">int</span> index)</span> &#123;</span><br><span class="line">  <span class="keyword">if</span> (index &gt;= size)</span><br><span class="line">    <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">IndexOutOfBoundsException</span>(outOfBoundsMsg(index));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="查询元素-get方法"><a href="#查询元素-get方法" class="headerlink" title="查询元素-get方法"></a>查询元素-get方法</h3><p>其实这些增删改查的方法都没有什么说的，都是我们一些常用的使用，查询还是根据下标索引调用get 方法即可，我们看下具体代码。</p>
+<p>首先就是判断索引是否越界，还是调用上面说的方法。然后就是上面没有说完的elementData 方法获取具体元素。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> E <span class="title function_">get</span><span class="params">(<span class="type">int</span> index)</span> &#123;</span><br><span class="line">  rangeCheck(index);</span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> elementData(index);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个不用看都知道，这个就是一个数据，使用数组取值就行。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">E <span class="title function_">elementData</span><span class="params">(<span class="type">int</span> index)</span> &#123;</span><br><span class="line">	<span class="keyword">return</span> (E) elementData[index];</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="修改方法-set方法"><a href="#修改方法-set方法" class="headerlink" title="修改方法-set方法"></a>修改方法-set方法</h3><p>这个的具体调用就是传入一个索引下标和需要修改的值即可。</p>
+<p>首先校验索引是否越界，然后通过获取到具体元素，再将元素替换即可。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> E <span class="title function_">set</span><span class="params">(<span class="type">int</span> index, E element)</span> &#123;</span><br><span class="line">	rangeCheck(index);</span><br><span class="line"></span><br><span class="line">  <span class="type">E</span> <span class="variable">oldValue</span> <span class="operator">=</span> elementData(index);</span><br><span class="line">  elementData[index] = element;</span><br><span class="line">  <span class="keyword">return</span> oldValue;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="链表集合-LinkedList"><a href="#链表集合-LinkedList" class="headerlink" title="链表集合-LinkedList"></a>链表集合-LinkedList</h2><p>说完ArrayList，我们再说说LinkedList，它同样是list 接口的实现类，但是区别于ArrayList 的数据结构，LinkedList 使用的是双向链表结构。</p>
+<p>那什么是双向链表呢，要知道双向链表，就要先了解链表，在zookeeper 系列的文章中有提到一个概念就是任务处理链，实现方式就是当前任务线程执行完成之后，就会往下个线程的查询队列中添加一个数据，当在队列中查询到数据时，下一个线程才会执行真正的任务处理，然后依次类推。</p>
+<p>也就是说，链就是当先对象关联着下一个对象的说明。链表就是上一个元素中有一个next 属性指向下个元素。双向链表就是不光有next 属性指向下个元素，还有pre 属性指向上个元素，这样开头元素能向下检索，结尾元素也能向上检索，这样有利于二分查询。</p>
+<h3 id="类构造器-无参构造"><a href="#类构造器-无参构造" class="headerlink" title="类构造器-无参构造"></a>类构造器-无参构造</h3><p>还是跟ArrayList 的讲解顺序一样，先看下LinkedList 的无参构造方法，也就是正常的new 出来。不过有意思的是这里什么都没有做。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="title function_">LinkedList</span><span class="params">()</span> &#123;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>既然什么都没有做，那么它又是怎么去存放元素的呢，这就要看下它存放的对象，node 节点对象。</p>
+<p>这里的元素存放属性item 表示可以存放任意对象，next 属性存放下一个节点，prev 属性存放上一个节点。这个节点对象初始化的时候，这三个属性也是必填的，这里没有无参构造了。简单来说LinkedList 就是由这么一个一个的对象构建出来的，所以无参构造不需要做任何操作</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">class</span> <span class="title class_">Node</span>&lt;E&gt; &#123;</span><br><span class="line">  E item;</span><br><span class="line">  Node&lt;E&gt; next;</span><br><span class="line">  Node&lt;E&gt; prev;</span><br><span class="line"></span><br><span class="line">  Node(Node&lt;E&gt; prev, E element, Node&lt;E&gt; next) &#123;</span><br><span class="line">    <span class="built_in">this</span>.item = element;</span><br><span class="line">    <span class="built_in">this</span>.next = next;</span><br><span class="line">    <span class="built_in">this</span>.prev = prev;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="添加元素-add方法"><a href="#添加元素-add方法" class="headerlink" title="添加元素-add方法"></a>添加元素-add方法</h3><p>还是跟上面一样的方法名，但是内容差距还是蛮大的。</p>
+<p>add 方法里面还是继续调用linkLast 方法。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="type">boolean</span> <span class="title function_">add</span><span class="params">(E e)</span> &#123;</span><br><span class="line">  linkLast(e);</span><br><span class="line">  <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个方法首先是获取头节点，然后在构建出node 节点对象，注意这里的构造我们上面可以看到，入参首先是上个节点，然后是元素，最后下个节点，那么如果是第一次写入，获取上个节点就是null，所以下面会进判断，将当前元素设置为头节点，然后增加集合长度，注意判断之前还有一个就是每一个节点linkedList 都将它当做最后一个节点，直到后一个节点进行覆盖。</p>
+<p>那么add 再次被调用的时候，第二个元素写入，获取到的上个节点就有值了，再然后就是将上个节点的下个节点属性赋值为当前节点。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">void</span> <span class="title function_">linkLast</span><span class="params">(E e)</span> &#123;</span><br><span class="line">  <span class="keyword">final</span> Node&lt;E&gt; l = last;</span><br><span class="line">  <span class="keyword">final</span> Node&lt;E&gt; newNode = <span class="keyword">new</span> <span class="title class_">Node</span>&lt;&gt;(l, e, <span class="literal">null</span>);</span><br><span class="line">  last = newNode;</span><br><span class="line">  <span class="keyword">if</span> (l == <span class="literal">null</span>)</span><br><span class="line">    first = newNode;</span><br><span class="line">  <span class="keyword">else</span></span><br><span class="line">    l.next = newNode;</span><br><span class="line">  size++;</span><br><span class="line">  modCount++;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>有点绕啊，我们可以看下结构图，这样就能清晰的看出linkedList 的数据结构了。因为就是这样的数据结构，所以就没有扩容的说法。</p>
+<p><img src="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/05/03/10:48:55-image-20220503104854183.png" alt="image-20220503104854183"></p>
+<h3 id="删除元素-remove方法-1"><a href="#删除元素-remove方法-1" class="headerlink" title="删除元素-remove方法"></a>删除元素-remove方法</h3><p>还是跟上面一个的方法名，看下具体代码。</p>
+<p>首先checkElementIndex 方法的调用不用看，跟上面ArrayList 的rangeCheck 方法一样，都是判断是否索引是否越界异常，然后就是unlink 方法的调用，注意：这里还有一个node 方法，这个就是查询当前节点对象。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> E <span class="title function_">remove</span><span class="params">(<span class="type">int</span> index)</span> &#123;</span><br><span class="line">  checkElementIndex(index);</span><br><span class="line">  <span class="keyword">return</span> unlink(node(index));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>先看node 方法是如何获取到当前元素的。</p>
+<p>这里会有一个我们之前说到的二分查询的概念，我们可以看到这里首先是将当前数组大小右移一位，也就是如果当前大小为5，那么右移结果为2，入参下标索引为3，也就是删除第4个元素，那么这里就会根据尾结点，倒着查询出当前节点，如果入参为1，那么就会从头节点顺查到当前节点。这就是二分查询，从中剖开，分段查询。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">Node&lt;E&gt; <span class="title function_">node</span><span class="params">(<span class="type">int</span> index)</span> &#123;</span><br><span class="line">  <span class="comment">// assert isElementIndex(index);</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (index &lt; (size &gt;&gt; <span class="number">1</span>)) &#123;</span><br><span class="line">    Node&lt;E&gt; x = first;</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> <span class="variable">i</span> <span class="operator">=</span> <span class="number">0</span>; i &lt; index; i++)</span><br><span class="line">      x = x.next;</span><br><span class="line">    <span class="keyword">return</span> x;</span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    Node&lt;E&gt; x = last;</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> <span class="variable">i</span> <span class="operator">=</span> size - <span class="number">1</span>; i &gt; index; i--)</span><br><span class="line">      x = x.prev;</span><br><span class="line">    <span class="keyword">return</span> x;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>再看unlink 方法。</p>
+<p>首先就是获取当前节点对象的所有属性信息，然后判断当前节点是不是头结点，或者尾结点，如果不是就将上一个节点的next 属性指向下一个节点，将下一个节点的prve 属性指向上个节点，也就是说将当前节点的上一个节点和下一个节点相互关联，将自身的关系剔除。</p>
+<p>然后再将当前节点的item 的属性设置为空，然后集合大小减一即可。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">E <span class="title function_">unlink</span><span class="params">(Node&lt;E&gt; x)</span> &#123;</span><br><span class="line">  <span class="comment">// assert x != null;</span></span><br><span class="line">  <span class="keyword">final</span> <span class="type">E</span> <span class="variable">element</span> <span class="operator">=</span> x.item;</span><br><span class="line">  <span class="keyword">final</span> Node&lt;E&gt; next = x.next;</span><br><span class="line">  <span class="keyword">final</span> Node&lt;E&gt; prev = x.prev;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (prev == <span class="literal">null</span>) &#123;</span><br><span class="line">    first = next;</span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    prev.next = next;</span><br><span class="line">    x.prev = <span class="literal">null</span>;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span> (next == <span class="literal">null</span>) &#123;</span><br><span class="line">    last = prev;</span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    next.prev = prev;</span><br><span class="line">    x.next = <span class="literal">null</span>;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  x.item = <span class="literal">null</span>;</span><br><span class="line">  size--;</span><br><span class="line">  modCount++;</span><br><span class="line">  <span class="keyword">return</span> element;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="查询元素-next方法"><a href="#查询元素-next方法" class="headerlink" title="查询元素-next方法"></a>查询元素-next方法</h3><p>这里的查询不再是根据下标索引查询了，当然使用get 方法一样能够查询，但是这里不建议用下标索引的方式来查询，而是用迭代的方式查询。</p>
+<p>使用迭代的话，我们就简单看下。</p>
+<p>首先就是获取迭代器，然后循环迭代，很正常的操作。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">Iterator&lt;Object&gt; objectIterator = linkedList.descendingIterator();</span><br><span class="line"></span><br><span class="line"><span class="keyword">while</span> (objectIterator.hasNext())&#123;</span><br><span class="line">  <span class="type">Object</span> <span class="variable">next</span> <span class="operator">=</span> objectIterator.next();</span><br><span class="line">  System.out.println(next);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>因为get 查询上面remove 方法已经讲过一次node 节点的获取了，这里就不再多聊了。其实不管是迭代器还是下表索引都是使用node 节点的next 属性和prev 属性来实现的，这个还是比较简单的。</p>
+<h3 id="修改方法-set方法-1"><a href="#修改方法-set方法-1" class="headerlink" title="修改方法-set方法"></a>修改方法-set方法</h3><p>这个更简单，通过索引获取到当前节点，然后直接修改node 对象中的item 的属性即可，代码都不用看，就是上面代码的拼接。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>本篇还是内容有点多，讲了三个对象的大体方法和流程，对了，这个还要提一句ArrayList 查询的时候使用for 循环即可，因为使用下标索引数组查询较快，不要使用迭代和增强for，因为增强for 的本质还是使用迭代器，而linkedList 使用迭代器查询或增强for 更佳，因为可以直接根据节点对象的next 属性获取下个节点对象，不用再使用二分查询之类的，迭代器会更加快速。</p>
+<p>那么jdk 源码分析的第一篇就结束了，后面会分析一下HashMap、Synchronized还有ConcurrentHashMap，这三个都比较复杂，都是单章，有需要的小伙伴可以根据下面的链接跳转。</p>
+<h2 id="附录JDK-源码分析系列文章"><a href="#附录JDK-源码分析系列文章" class="headerlink" title="附录JDK 源码分析系列文章"></a>附录JDK 源码分析系列文章</h2><table>
+<thead>
+<tr>
+<th align="left">时间</th>
+<th>文章</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">2022-04-25</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/04/25/JDK-1/#more">Object、ArrayList以及LinkedList源码分析</a></td>
+</tr>
+<tr>
+<td align="left">2022-04-27</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/04/27/JDK-2/#more">HsahMap的面试详解及源码分析</a></td>
+</tr>
+</tbody></table>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/JDK/" rel="tag"># JDK</a>
+              <a href="/tags/Object/" rel="tag"># Object</a>
+              <a href="/tags/ArrayList/" rel="tag"># ArrayList</a>
+              <a href="/tags/LinkedList/" rel="tag"># LinkedList</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2022/03/21/MyBatis-1/" rel="prev" title="MyBatis架构及完成执行流程源码分析">
+                  <i class="fa fa-chevron-left"></i> MyBatis架构及完成执行流程源码分析
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2022/04/27/JDK-2/" rel="next" title="HsahMap的面试详解及源码分析">
+                  HsahMap的面试详解及源码分析 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">李万青</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/next-boot.js"></script>
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+</body>
+</html>

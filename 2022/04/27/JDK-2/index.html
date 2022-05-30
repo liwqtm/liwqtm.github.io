@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 6.2.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css" integrity="sha256-DfWjNxDkM94fVBWx1H5BMMp0Zq7luBlV8QRcSES7s+0=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"example.com","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.11.1","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12},"copycode":{"enable":false,"style":null},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="本次接着上篇说jdk 中的HashMap，这个是一个比较复杂的重点，因为看懂了这个，后面Redis 的数据结构基本上就懂一半，而且之后所有涉及hash 表的逻辑都可以套用，最主要的就是这玩意儿面试问jdk 基本都要被问到。本次我会和结合hash表、hash碰撞的解决来聊一下hashMap 的源码，同时会将jdk1.7 和1.8 之间hashMap 区别更新说一下，至于1.8 扩容出现的红黑树这里会">
+<meta property="og:type" content="article">
+<meta property="og:title" content="HsahMap的面试详解及源码分析">
+<meta property="og:url" content="http://example.com/2022/04/27/JDK-2/index.html">
+<meta property="og:site_name" content="茯楚博客">
+<meta property="og:description" content="本次接着上篇说jdk 中的HashMap，这个是一个比较复杂的重点，因为看懂了这个，后面Redis 的数据结构基本上就懂一半，而且之后所有涉及hash 表的逻辑都可以套用，最主要的就是这玩意儿面试问jdk 基本都要被问到。本次我会和结合hash表、hash碰撞的解决来聊一下hashMap 的源码，同时会将jdk1.7 和1.8 之间hashMap 区别更新说一下，至于1.8 扩容出现的红黑树这里会">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/05/04/12:35:11-13:19:16-image-20220503131915693.png">
+<meta property="og:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/05/04/19:28:57-image-20220504192856251.png">
+<meta property="article:published_time" content="2022-04-26T16:00:00.000Z">
+<meta property="article:modified_time" content="2022-05-09T07:22:11.083Z">
+<meta property="article:author" content="李万青">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="JDK">
+<meta property="article:tag" content="HashMap">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/05/04/12:35:11-13:19:16-image-20220503131915693.png">
+
+
+<link rel="canonical" href="http://example.com/2022/04/27/JDK-2/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://example.com/2022/04/27/JDK-2/","path":"2022/04/27/JDK-2/","title":"HsahMap的面试详解及源码分析"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>HsahMap的面试详解及源码分析 | 茯楚博客</title>
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">茯楚博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">记录整理技术文章</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#HashMap%E7%9A%84%E5%AD%98%E5%82%A8%E7%BB%93%E6%9E%84%E5%93%88%E5%B8%8C%E8%A1%A8"><span class="nav-number">1.</span> <span class="nav-text">HashMap的存储结构哈希表</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#hash%E7%A2%B0%E6%92%9E"><span class="nav-number">1.1.</span> <span class="nav-text">hash碰撞</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#jdk1-7%E5%92%8Cjdk1-8%E4%B9%8B%E9%97%B4hashMap%E5%AD%98%E5%82%A8%E7%BB%93%E6%9E%84%E7%9A%84%E4%B8%8D%E5%90%8C"><span class="nav-number">1.2.</span> <span class="nav-text">jdk1.7和jdk1.8之间hashMap存储结构的不同</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#HashMap%E7%9A%84%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90"><span class="nav-number">2.</span> <span class="nav-text">HashMap的源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%B1%BB%E6%9E%84%E9%80%A0%E5%99%A8-%E6%97%A0%E5%8F%82%E6%9E%84%E9%80%A0%E5%92%8C%E6%9C%89%E5%8F%82%E6%9E%84%E9%80%A0"><span class="nav-number">2.1.</span> <span class="nav-text">类构造器-无参构造和有参构造</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B7%BB%E5%8A%A0%E5%85%83%E7%B4%A0%E6%96%B9%E6%B3%95-put%E6%96%B9%E6%B3%95"><span class="nav-number">2.2.</span> <span class="nav-text">添加元素方法-put方法</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%88%9D%E5%A7%8B%E5%8C%96hash%E8%A1%A8%E7%9A%84%E6%96%B9%E6%B3%95-inflateTable%E6%96%B9%E6%B3%95"><span class="nav-number">2.2.1.</span> <span class="nav-text">初始化hash表的方法-inflateTable方法</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#key%E5%80%BC%E4%B8%BAnull%E7%9A%84%E6%95%B0%E6%8D%AE%E6%B7%BB%E5%8A%A0%E6%96%B9%E6%B3%95-putForNullKey%E6%96%B9%E6%B3%95"><span class="nav-number">2.2.2.</span> <span class="nav-text">key值为null的数据添加方法-putForNullKey方法</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%8E%B7%E5%8F%96key%E7%9A%84hash%E5%80%BC%E6%96%B9%E6%B3%95-hash%E6%96%B9%E6%B3%95"><span class="nav-number">2.2.3.</span> <span class="nav-text">获取key的hash值方法-hash方法</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%AE%A1%E7%AE%97key%E7%9A%84hash%E5%80%BC%E5%AF%B9%E5%BA%94%E7%9A%84%E4%B8%8B%E6%A0%87%E7%B4%A2%E5%BC%95%E6%96%B9%E6%B3%95-indexFor%E6%96%B9%E6%B3%95"><span class="nav-number">2.2.4.</span> <span class="nav-text">计算key的hash值对应的下标索引方法-indexFor方法</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%B7%BB%E5%8A%A0%E5%85%83%E7%B4%A0-addEntry%E6%96%B9%E6%B3%95"><span class="nav-number">2.2.5.</span> <span class="nav-text">添加元素-addEntry方法</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#HashMap1-7%E7%89%88%E6%9C%AC%E7%9A%84%E6%95%B0%E7%BB%84%E6%89%A9%E5%AE%B9"><span class="nav-number">2.3.</span> <span class="nav-text">HashMap1.7版本的数组扩容</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#HashMap1-8%E7%89%88%E6%9C%AC%E7%9A%84%E6%95%B0%E7%BB%84%E6%89%A9%E5%AE%B9"><span class="nav-number">2.4.</span> <span class="nav-text">HashMap1.8版本的数组扩容</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%89%A9%E5%AE%B9%E5%92%8C%E5%88%9D%E5%A7%8B%E5%8C%96%E7%9A%84%E5%87%86%E5%A4%87%E5%B7%A5%E4%BD%9C"><span class="nav-number">2.4.1.</span> <span class="nav-text">扩容和初始化的准备工作</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%89%A9%E5%AE%B9%E6%98%8E%E7%BB%86"><span class="nav-number">2.4.2.</span> <span class="nav-text">扩容明细</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%8D%95%E4%B8%AA%E8%8A%82%E7%82%B9%E5%AF%B9%E8%B1%A1%E5%A4%84%E7%90%86"><span class="nav-number">2.4.2.1.</span> <span class="nav-text">单个节点对象处理</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E7%BA%A2%E9%BB%91%E6%A0%91%E8%8A%82%E7%82%B9%E5%A4%84%E7%90%86"><span class="nav-number">2.4.2.2.</span> <span class="nav-text">红黑树节点处理</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E9%93%BE%E8%A1%A8%E8%8A%82%E7%82%B9%E7%9A%84%E5%A4%84%E7%90%86"><span class="nav-number">2.4.2.3.</span> <span class="nav-text">链表节点的处理</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%B0%8F%E7%BB%93"><span class="nav-number">2.4.2.4.</span> <span class="nav-text">小结</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%A0%E9%99%A4%E5%85%83%E7%B4%A0%E6%96%B9%E6%B3%95-remove%E6%96%B9%E6%B3%95"><span class="nav-number">2.5.</span> <span class="nav-text">删除元素方法-remove方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BF%AE%E6%94%B9%E5%85%83%E7%B4%A0%E6%96%B9%E6%B3%95-%E8%BF%98%E6%98%AFput%E6%96%B9%E6%B3%95"><span class="nav-number">2.6.</span> <span class="nav-text">修改元素方法-还是put方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9F%A5%E8%AF%A2%E5%85%83%E7%B4%A0%E7%9A%84%E6%96%B9%E6%B3%95-get%E6%96%B9%E6%B3%95"><span class="nav-number">2.7.</span> <span class="nav-text">查询元素的方法-get方法</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">3.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#HashMap%E5%B8%B8%E8%A7%81%E9%9D%A2%E8%AF%95%E9%A2%98"><span class="nav-number">4.</span> <span class="nav-text">HashMap常见面试题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%99%84%E5%BD%95JDK-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E7%B3%BB%E5%88%97%E6%96%87%E7%AB%A0"><span class="nav-number">5.</span> <span class="nav-text">附录JDK 源码分析系列文章</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="李万青"
+      src="/images/8a06cd0a8da6a6848b7a0b37b32164b7.jpeg">
+  <p class="site-author-name" itemprop="name">李万青</p>
+  <div class="site-description" itemprop="description">苦心人天不负</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">14</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/liwqtm/liwqtm.github.io" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;liwqtm&#x2F;liwqtm.github.io" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll site-overview-item animated">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/m0_51464746?type=blog" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;m0_51464746?type&#x3D;blog" rel="noopener" target="_blank">张怀猛的博客</a>
+        </li>
+    </ul>
+  </div>
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2022/04/27/JDK-2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/8a06cd0a8da6a6848b7a0b37b32164b7.jpeg">
+      <meta itemprop="name" content="李万青">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="茯楚博客">
+      <meta itemprop="description" content="苦心人天不负">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="HsahMap的面试详解及源码分析 | 茯楚博客">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          HsahMap的面试详解及源码分析
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2022-04-27 00:00:00" itemprop="dateCreated datePublished" datetime="2022-04-27T00:00:00+08:00">2022-04-27</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-09 15:22:11" itemprop="dateModified" datetime="2022-05-09T15:22:11+08:00">2022-05-09</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Java%E5%9F%BA%E7%A1%80/" itemprop="url" rel="index"><span itemprop="name">Java基础</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Java%E5%9F%BA%E7%A1%80/JDK/" itemprop="url" rel="index"><span itemprop="name">JDK</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>本次接着上篇说jdk 中的HashMap，这个是一个比较复杂的重点，因为看懂了这个，后面Redis 的数据结构基本上就懂一半，而且之后所有涉及hash 表的逻辑都可以套用，最主要的就是这玩意儿面试问jdk 基本都要被问到。本次我会和结合hash表、hash碰撞的解决来聊一下hashMap 的源码，同时会将jdk1.7 和1.8 之间hashMap 区别更新说一下，至于1.8 扩容出现的红黑树这里会简单聊一下，具体的后面算法文章再详谈。<span id="more"></span></p>
+<h2 id="HashMap的存储结构哈希表"><a href="#HashMap的存储结构哈希表" class="headerlink" title="HashMap的存储结构哈希表"></a>HashMap的存储结构哈希表</h2><p>在聊hashMap 之前，还是需要先简单聊一下什么是哈希表，因为hashMap 的数据结构就是哈希表。</p>
+<p>Hash表也称为散列表，也有直接译作哈希表，Hash表是一种根据关键字值（key - value）而直接进行访问的数据结构（这里可以看出Redis 也是这种结构）。它是通过把关键码值映射到表中一个位置来访问记录，以加快查找的速度。这个映射函数叫做<strong>散列函数</strong>，存放记录的数组叫做<strong>散列表</strong>。其数据结构图如下：<img src="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/05/04/12:35:11-13:19:16-image-20220503131915693.png" alt="image-20220503131915693"></p>
+<h3 id="hash碰撞"><a href="#hash碰撞" class="headerlink" title="hash碰撞"></a>hash碰撞</h3><p>那么如果多个key 通过散列函数得到同一个hash 值，这样就形成了hash 碰撞，也叫hash 冲突。这里提供两种解决方式：开放寻址法（也就叫开放定址法）、拉链法（也叫链地址法），前者是去寻找别的地址来存储数据，后置是在原地址上拉出一个链表，用链表来分别存储数据。</p>
+<h3 id="jdk1-7和jdk1-8之间hashMap存储结构的不同"><a href="#jdk1-7和jdk1-8之间hashMap存储结构的不同" class="headerlink" title="jdk1.7和jdk1.8之间hashMap存储结构的不同"></a>jdk1.7和jdk1.8之间hashMap存储结构的不同</h3><p>1.8 之前hashMap 是采用数组 + 链表的形式来存储的，首先是后去key 的hash值，然后用hash 值来计算出下标索引（这里一般称为：哈希桶数组索引位置，我简称：桶的位置，后面文章也就是怎么说），在桶的位置来存储value 到数组，如果计算出相同桶的位置，就会在原本的数据上拉出一个链表，来分别存储不同的数据。注意：这里就意味着不管要存储value 还要存储hash值和key值，也就是说这里存储的是节点对象。</p>
+<p>1.8 之后hashMap 做出了一个变化就是在原有基础上增加红黑树，因为就算有链表还是会存在链表过长，查询过慢的问题，所以加上红黑树的数据结构就是为了增加查询效率，当链表和数组过长时，就会在原本的增加节点上改为红黑树存储方式，其转换界限就是：链表长度为8同时数组长度为64，红黑树转回链表界限就是：链表长度为6。</p>
+<h2 id="HashMap的源码分析"><a href="#HashMap的源码分析" class="headerlink" title="HashMap的源码分析"></a>HashMap的源码分析</h2><p>简单介绍完hash 表的结构和hashMap 存储结构1.7和1.8之前的区别后，我们再详细看下hashMap 的源码。这里我们分析还是跟之前ArrayList 和LinkedList 的分析一样，从无参构造 -&gt; 增删改查（中间会穿插扩容机制）-&gt; 循环迭代的顺序来分析。那么现在就开始发车了，没上车的小伙伴跑起来，老司机开车，车门已焊死。</p>
+<h3 id="类构造器-无参构造和有参构造"><a href="#类构造器-无参构造和有参构造" class="headerlink" title="类构造器-无参构造和有参构造"></a>类构造器-无参构造和有参构造</h3><p>还是老套路，我们先看最常用的构建方式，new HashMap&lt;&gt;()。</p>
+<p>这里就调用有两个入参的有参构造方法，第一个参数是数组的初始长度为16，第二个是加载因子为0.75。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="keyword">final</span> <span class="type">int</span> <span class="variable">DEFAULT_INITIAL_CAPACITY</span> <span class="operator">=</span> <span class="number">1</span> &lt;&lt; <span class="number">4</span>;<span class="comment">// aka 16  //默认 HashMap 集合初始容量为16（必须是 2 的倍数）</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">static</span> <span class="keyword">final</span> <span class="type">float</span> <span class="variable">DEFAULT_LOAD_FACTOR</span> <span class="operator">=</span> <span class="number">0.75f</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="title function_">HashMap</span><span class="params">()</span> &#123;</span><br><span class="line">	<span class="built_in">this</span>(DEFAULT_INITIAL_CAPACITY, DEFAULT_LOAD_FACTOR);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>那么什么是加载因子呢，我们要先记住一个公式：加载因子 * 数组长度 &#x3D; 扩容界限，加载因子也就是对于扩容的一个界限定义而已。</p>
+<p>至于为什么是0.75，很简答因为java 的规定啊，哈哈哈，不过一定要较真的话，可以想一下，如果<strong>加载因子是1</strong>的话，那么扩容的界限就是数组长度，换句话说只有当数组填满的时候，才能扩容，这样就会很影响查询效率，因为有hash冲突的情况下，同一个下标还会拉出一个链表，这样就导致了填满数组需要的数据可能要大于数组本身的大小，这样一来查询的是就会大打折扣。但是如果<strong>加载因子是0.5</strong>的话，那就是数组不过半就开始扩容了，频繁的扩容会消耗资源。<strong>加载因子是0.75</strong>是反复衡量的结果，不多不少。</p>
+<p>说了无参构造，那么说说有参构造。</p>
+<p>有参构造直接看两个入参的，这两个入参的是传入了数组初始长度和加载因子，上面的无参构造也是调用的这个。这个构造方法主要做的就是为加载因子loadFactor 属性和threshold 数组的初始长度赋值。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="title function_">HashMap</span><span class="params">(<span class="type">int</span> initialCapacity, <span class="type">float</span> loadFactor)</span> &#123;</span><br><span class="line">  <span class="keyword">if</span> (initialCapacity &lt; <span class="number">0</span>)</span><br><span class="line">    <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">IllegalArgumentException</span>(<span class="string">&quot;Illegal initial capacity: &quot;</span> +</span><br><span class="line">                                       initialCapacity);</span><br><span class="line">  <span class="keyword">if</span> (initialCapacity &gt; MAXIMUM_CAPACITY)</span><br><span class="line">    initialCapacity = MAXIMUM_CAPACITY;</span><br><span class="line">  <span class="keyword">if</span> (loadFactor &lt;= <span class="number">0</span> || Float.isNaN(loadFactor))</span><br><span class="line">    <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">IllegalArgumentException</span>(<span class="string">&quot;Illegal load factor: &quot;</span> +</span><br><span class="line">                                       loadFactor);</span><br><span class="line"></span><br><span class="line">  <span class="built_in">this</span>.loadFactor = loadFactor;</span><br><span class="line">  threshold = initialCapacity;</span><br><span class="line">  init();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里有一点需要注意：数组的初始长度一定是2的倍数，如果传入的不是，那么会自动找到其入参最近的2N次方赋值（不是2的倍数，之前我就搞错了这一点），比如入参的初始长度为9，真正的数组长度赋值为16，初始长度为15，赋值还是16，因为其最近2的N次方都是16。</p>
+<h3 id="添加元素方法-put方法"><a href="#添加元素方法-put方法" class="headerlink" title="添加元素方法-put方法"></a>添加元素方法-put方法</h3><p>put 方法基本上是我们集合使用最常见的方法，我们就直接看代码。注意下面我们的代码都是看1.7版本的代码，1.8版本的代码没有1.7版本的可读性高。</p>
+<p>这里首先判断hash 表有没有初始化，如果没有则需要先初始化hash 表，调用inflateTable 方法进行初始化，然后就是判断当前key 是否为null，记住面试的时候，有会问key 值为null，可不可以存入hashMap？答案是：可以。这里调用的是putForNullKey 方法，然后就是通过hash 方法获取key 的hash值，再然后就是通过hash值计算出下标索引，最后通过下标索引获取当前位置的链表，如果没有则走下面的调用addEntry 方法，如果有，则获取到最后一个节点，其中还要判断key 值是否已经存在，存在则覆盖原值，反之还是走下面的addEntry 方法调用。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">transient</span> Entry&lt;K,V&gt;[] table = (Entry&lt;K,V&gt;[]) EMPTY_TABLE;<span class="comment">//HashMap底层数组，数组存储元素是Entry类型</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> V <span class="title function_">put</span><span class="params">(K key, V value)</span> &#123;</span><br><span class="line">  <span class="keyword">if</span> (table == EMPTY_TABLE) &#123;  <span class="comment">// 1. 若哈希表未初始化（即 table为空)</span></span><br><span class="line">    inflateTable(threshold);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">if</span> (key == <span class="literal">null</span>)</span><br><span class="line">    <span class="keyword">return</span> putForNullKey(value);</span><br><span class="line">  <span class="type">int</span> <span class="variable">hash</span> <span class="operator">=</span> hash(key);</span><br><span class="line">  <span class="type">int</span> <span class="variable">i</span> <span class="operator">=</span> indexFor(hash, table.length);</span><br><span class="line">  <span class="keyword">for</span> (Entry&lt;K,V&gt; e = table[i]; e != <span class="literal">null</span>; e = e.next) &#123;</span><br><span class="line">    Object k;</span><br><span class="line">    <span class="keyword">if</span> (e.hash == hash &amp;&amp; ((k = e.key) == key || key.equals(k))) &#123;</span><br><span class="line">      <span class="type">V</span> <span class="variable">oldValue</span> <span class="operator">=</span> e.value;</span><br><span class="line">      e.value = value;</span><br><span class="line">      e.recordAccess(<span class="built_in">this</span>);</span><br><span class="line">      <span class="keyword">return</span> oldValue;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  modCount++;</span><br><span class="line">  addEntry(hash, key, value, i);</span><br><span class="line">  <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>总结一下上面提到的方法，我们这里一个个看，首先是inflateTable 方法初始化hash 表，putForNullKey 方法添加key 值为null 的数据，hash 方法获取key 的hash 值，indexFor 方法计算key 的hash值对应的下标索引（也就是桶的位置），然后是recordAccess 方法覆盖，也就是下面要说的修改方法，其实就是想原本节点对象中的value 属性进行覆盖，这个方法就不看了太简单了，最后就是addEntry 方法来添加元素。一共是6个方法，我们具体看其中的5个。</p>
+<h4 id="初始化hash表的方法-inflateTable方法"><a href="#初始化hash表的方法-inflateTable方法" class="headerlink" title="初始化hash表的方法-inflateTable方法"></a>初始化hash表的方法-inflateTable方法</h4><p>直接看代码。</p>
+<p>这里很简单就是获取当前数组的长度，因为存在有参构造，是可以自己定义长度的，所以要判断当前入参的长度不能大于最大长度，一般情况下不可能，最大长度是一个很大的数字，正常来讲都是取当前长度。</p>
+<p>注意这里的数组长度不再是threshold 属性的值了，虽然入参toSize 属性是threshold 的属性值，但是这里代表数组长度的是capacity 属性，roundUpToPowerOf2 方法会计算出不是2 的倍数的数据，然后强制修改为2 的倍数，所以才是上面说的数组长度一定是2 的倍数。</p>
+<p>至于threshold 属性，这里代表的是扩容阀值，也就是之前说的数组长度 * 加载因子。</p>
+<p>然后就是new 当前长度的Entry 对象数组。最后的initHashSeedAsNeeded 不用管。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title function_">inflateTable</span><span class="params">(<span class="type">int</span> toSize)</span> &#123;</span><br><span class="line">  <span class="comment">// Find a power of 2 &gt;= toSize</span></span><br><span class="line">  <span class="type">int</span> <span class="variable">capacity</span> <span class="operator">=</span> roundUpToPowerOf2(toSize);</span><br><span class="line"></span><br><span class="line">  threshold = (<span class="type">int</span>) Math.min(capacity * loadFactor, MAXIMUM_CAPACITY + <span class="number">1</span>);</span><br><span class="line">  table = <span class="keyword">new</span> <span class="title class_">Entry</span>[capacity];</span><br><span class="line">  initHashSeedAsNeeded(capacity);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="key值为null的数据添加方法-putForNullKey方法"><a href="#key值为null的数据添加方法-putForNullKey方法" class="headerlink" title="key值为null的数据添加方法-putForNullKey方法"></a>key值为null的数据添加方法-putForNullKey方法</h4><p>还是直接看代码。</p>
+<p>还是跟上面一样的套路，取hash 表中的第一个节点对象，如果不为null，则获取其链表，然后判断是否存在key 值为null 的数据，有则覆盖，无则调用addEntry 方法，注意对比一下上面的addEntry 方法的调用，我们按照入参顺序对比，其中hash 值为0，key 值为null，只有value 值有真正传参，最后就是下标索引为0。</p>
+<p>这也就说，key 值为null 的情况，是将value 存入了hash 表的第一个节点，而且不能重复存入，只能有一个key 值为null 的情况，如果已经存在，那么就会将原本的值进行覆盖。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> V <span class="title function_">putForNullKey</span><span class="params">(V value)</span> &#123;</span><br><span class="line">  <span class="keyword">for</span> (Entry&lt;K,V&gt; e = table[<span class="number">0</span>]; e != <span class="literal">null</span>; e = e.next) &#123;</span><br><span class="line">    <span class="keyword">if</span> (e.key == <span class="literal">null</span>) &#123;</span><br><span class="line">      <span class="type">V</span> <span class="variable">oldValue</span> <span class="operator">=</span> e.value;</span><br><span class="line">      e.value = value;</span><br><span class="line">      e.recordAccess(<span class="built_in">this</span>);</span><br><span class="line">      <span class="keyword">return</span> oldValue;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  modCount++;</span><br><span class="line">  addEntry(<span class="number">0</span>, <span class="literal">null</span>, value, <span class="number">0</span>);</span><br><span class="line">  <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="获取key的hash值方法-hash方法"><a href="#获取key的hash值方法-hash方法" class="headerlink" title="获取key的hash值方法-hash方法"></a>获取key的hash值方法-hash方法</h4><p>这里我们先看1.7 版本的代码。</p>
+<p>这里不管其中的计算方式，结论是一共扰动9次（5次异或计算、4次右移计算），其目的就是为了增加hash 值的离散性，充分利用数组空间，避免数组中的链表过长，而数组长度过小。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">final</span> <span class="type">int</span> <span class="title function_">hash</span><span class="params">(Object k)</span> &#123;</span><br><span class="line">  <span class="type">int</span> <span class="variable">h</span> <span class="operator">=</span> hashSeed;</span><br><span class="line">  <span class="keyword">if</span> (<span class="number">0</span> != h &amp;&amp; k <span class="keyword">instanceof</span> String) &#123;</span><br><span class="line">    <span class="keyword">return</span> sun.misc.Hashing.stringHash32((String) k);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  h ^= k.hashCode();</span><br><span class="line">  </span><br><span class="line">  <span class="comment">//  扰动9次（5次异或 4次右移）</span></span><br><span class="line">  h ^= (h &gt;&gt;&gt; <span class="number">20</span>) ^ (h &gt;&gt;&gt; <span class="number">12</span>);</span><br><span class="line">  <span class="keyword">return</span> h ^ (h &gt;&gt;&gt; <span class="number">7</span>) ^ (h &gt;&gt;&gt; <span class="number">4</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>1.8 版本代码是由区别的。</p>
+<p>这里只进过了两次扰动（一次异或，一次右移），那么这里为什么不跟1.7 一样呢，因为1.8 加入了红黑树的数据结构，不再拘束于链表，对于数组空间的利用不再那么硬性要求。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="keyword">final</span> <span class="type">int</span> <span class="title function_">hash</span><span class="params">(Object key)</span> &#123;</span><br><span class="line">  <span class="type">int</span> h;</span><br><span class="line">  <span class="keyword">return</span> (key == <span class="literal">null</span>) ? <span class="number">0</span> : (h = key.hashCode()) ^ (h &gt;&gt;&gt; <span class="number">16</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="计算key的hash值对应的下标索引方法-indexFor方法"><a href="#计算key的hash值对应的下标索引方法-indexFor方法" class="headerlink" title="计算key的hash值对应的下标索引方法-indexFor方法"></a>计算key的hash值对应的下标索引方法-indexFor方法</h4><p>这个方法的内容在1.7 版本和1.8 版本的代码都是一样的。</p>
+<p>入参h 是key 的hash值，length 是当前数组的长度，然后两个进行 &amp; 运算，也就意味着索引下标的计算跟数组长度是有直接关系的，其实我这里想表达的是后面扩容的时候，当数组长度变大后，如果将原本的数据再次计算下标索引的话，所对应的值会存在不同，也就是意味着扩容就是链表缩小，数组增长。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="type">int</span> <span class="title function_">indexFor</span><span class="params">(<span class="type">int</span> h, <span class="type">int</span> length)</span> &#123;</span><br><span class="line">  <span class="comment">// assert Integer.bitCount(length) == 1 : &quot;length must be a non-zero power of 2&quot;;</span></span><br><span class="line">  <span class="keyword">return</span> h &amp; (length-<span class="number">1</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="添加元素-addEntry方法"><a href="#添加元素-addEntry方法" class="headerlink" title="添加元素-addEntry方法"></a>添加元素-addEntry方法</h4><p>再看最后一个方法，添加元素的addEntry 方法。</p>
+<p>这里首先就是要判断当前数组是否需要扩容，其界限就是集合大小 &gt;&#x3D; 扩容阀值，并且当前，也就是当前添加操作是向链表添加数据。扩容这里我们后面说，我们先看createEntry 方法的调用。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">void</span> <span class="title function_">addEntry</span><span class="params">(<span class="type">int</span> hash, K key, V value, <span class="type">int</span> bucketIndex)</span> &#123;</span><br><span class="line">  <span class="keyword">if</span> ((size &gt;= threshold) &amp;&amp; (<span class="literal">null</span> != table[bucketIndex])) &#123;</span><br><span class="line">    resize(<span class="number">2</span> * table.length);</span><br><span class="line">    hash = (<span class="literal">null</span> != key) ? hash(key) : <span class="number">0</span>;</span><br><span class="line">    bucketIndex = indexFor(hash, table.length);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  createEntry(hash, key, value, bucketIndex);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个方法也很简单。</p>
+<p>通过下标索引获取数组中的节点元素，然后在根据节点元素创建出新的节点元素对象，然后放到数组中，集合长度累加即可。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">void</span> <span class="title function_">createEntry</span><span class="params">(<span class="type">int</span> hash, K key, V value, <span class="type">int</span> bucketIndex)</span> &#123;</span><br><span class="line">  Entry&lt;K,V&gt; e = table[bucketIndex];</span><br><span class="line">  table[bucketIndex] = <span class="keyword">new</span> <span class="title class_">Entry</span>&lt;&gt;(hash, key, value, e);</span><br><span class="line">  size++;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我们这里要关注的就是节点元素的数据结构。</p>
+<p>其中有四个属性当前的value、key、key 的hash 值，最后就是上一个元素对象。可以得出，当前元素是包裹着上个元素的，就像是套娃一样，和之前说的linkedList 不一样的是这里可以看出是一个单向链表，只有对应的上一个元素。比如说现在有3层套娃，数据查询应该就是3 -&gt; 2 -&gt; 1。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">final</span> K key;</span><br><span class="line">V value;</span><br><span class="line">Entry&lt;K,V&gt; next;</span><br><span class="line"><span class="type">int</span> hash;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Creates new entry.</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line">Entry(<span class="type">int</span> h, K k, V v, Entry&lt;K,V&gt; n) &#123;</span><br><span class="line">  value = v;</span><br><span class="line">  next = n;</span><br><span class="line">  key = k;</span><br><span class="line">  hash = h;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>对了这里1.8 版本的代码其实区别不大，就是换了一个名字而已，不再是Entry 对象，而是Node 对象，其余的不变。</p>
+<h3 id="HashMap1-7版本的数组扩容"><a href="#HashMap1-7版本的数组扩容" class="headerlink" title="HashMap1.7版本的数组扩容"></a>HashMap1.7版本的数组扩容</h3><p>接着上面的addEntry 方法说，当集合大小 &gt;&#x3D; 扩容阀值，并且当前下标索引指向数组位置存在数据时，那么就会将数组扩容。</p>
+<p>其具体操作是先调用resize 方法新增一个数组，其大小为当前数组大小的2倍，然后再次计算key 的hash 值，最后再根据hash 值计算下标索引，这里的hash 方法和indexFor 方法都是跟上面一样的套路。这个判断走完之后，还是继续调用createEntry 方法。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> ((size &gt;= threshold) &amp;&amp; (<span class="literal">null</span> != table[bucketIndex])) &#123;</span><br><span class="line">  resize(<span class="number">2</span> * table.length);</span><br><span class="line">  hash = (<span class="literal">null</span> != key) ? hash(key) : <span class="number">0</span>;</span><br><span class="line">  bucketIndex = indexFor(hash, table.length);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>注意：这里1.7 的版本代码，也是意味着1.7 是先扩容，然后再添加数据的。</p>
+<p>再看resize 方法。</p>
+<p>这里就是先获取当数组和其大小，然后判断当前数组大小是否已经到了最大值，如果是则将扩容阀值设置为最大值，意味着这里不能在扩容了。</p>
+<p>如果当前数组没有到最大值，那么就再new 一个长度为当前数组大小两倍的新数组，然后调用transfer 方法将原数组的数据转移到新数组上面，这里会重新计算所有元素的下标索引。</p>
+<p>下一步就是将新数组赋值给当前数组对象，并且将扩容阀值修改为新数组的长度 * 加载因子的结果。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">void</span> <span class="title function_">resize</span><span class="params">(<span class="type">int</span> newCapacity)</span> &#123;</span><br><span class="line">  Entry[] oldTable = table;</span><br><span class="line">  <span class="type">int</span> <span class="variable">oldCapacity</span> <span class="operator">=</span> oldTable.length;</span><br><span class="line">  <span class="keyword">if</span> (oldCapacity == MAXIMUM_CAPACITY) &#123;</span><br><span class="line">    threshold = Integer.MAX_VALUE;</span><br><span class="line">    <span class="keyword">return</span>;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  Entry[] newTable = <span class="keyword">new</span> <span class="title class_">Entry</span>[newCapacity];</span><br><span class="line">  transfer(newTable, initHashSeedAsNeeded(newCapacity));</span><br><span class="line">  table = newTable;</span><br><span class="line">  threshold = (<span class="type">int</span>)Math.min(newCapacity * loadFactor, MAXIMUM_CAPACITY + <span class="number">1</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>上面的方法我们还需要再看下transfer 方法，这里的目的是将原数组的数据转移到新数组上面。</p>
+<p>这里就是循环当前数组，然后获取到每一个数组元素对象，如果存在链表，还需要将链表的每一个元素解析出来，注意这里是会调用indexFor 方法重新计算每一个元素的新下标索引，然后再存入新数组，同时当前元素的next 属性指向新数组的当前索引下的对象，也就是完成链表指向。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">void</span> <span class="title function_">transfer</span><span class="params">(Entry[] newTable, <span class="type">boolean</span> rehash)</span> &#123;</span><br><span class="line">  <span class="type">int</span> <span class="variable">newCapacity</span> <span class="operator">=</span> newTable.length;</span><br><span class="line">  <span class="keyword">for</span> (Entry&lt;K,V&gt; e : table) &#123;</span><br><span class="line">    <span class="keyword">while</span>(<span class="literal">null</span> != e) &#123;</span><br><span class="line">      Entry&lt;K,V&gt; next = e.next;</span><br><span class="line">      <span class="keyword">if</span> (rehash) &#123;</span><br><span class="line">        e.hash = <span class="literal">null</span> == e.key ? <span class="number">0</span> : hash(e.key);</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="type">int</span> <span class="variable">i</span> <span class="operator">=</span> indexFor(e.hash, newCapacity);</span><br><span class="line">      e.next = newTable[i];</span><br><span class="line">      newTable[i] = e;</span><br><span class="line">      e = next;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>文字描述可能不是很清楚，用数字走一遍，原数组链表目前3 -&gt; 2 -&gt;1 的顺序（如果下标索引没有变化的话，当然这个是有可能变化的，因为之前是根据原数组长度计算的，现在是通过新数组长度计算），那么首先取出来的就是3 对象，然后3 对象的next 属性指向null，然后是2 对象，其next 属性指向3，然后是1 对象，其next 属性指向2。</p>
+<p>可以看到目前这种插入方式是将原本顺序进行了倒叙，而方式也被称为头插法，并发情况下，同时扩容时会出现死循环的，因为有可能两条线程导致1 对象指向2 对象，2 对象由反过来指向1 对象，形成一个闭环。当然hashMap 本身就不支持高并发情况，也不建议高并发场景使用。</p>
+<p>1.7 的版本代码中只有数组加链表，会好理解很多，1.8 之后的版本是增加了红黑树的存储结构，相对来说比较复杂，红黑树部分的内容后面算法的文章会详细说，这里只会简单概述一下，主要还是说流程。</p>
+<h3 id="HashMap1-8版本的数组扩容"><a href="#HashMap1-8版本的数组扩容" class="headerlink" title="HashMap1.8版本的数组扩容"></a>HashMap1.8版本的数组扩容</h3><p>扩容的方法名还是跟1.7的一致，也就是resize 方法，不过其中的第一区别就是之前说过的Entry 对象改为了node 对象，不管其内容结果还是一样的，不过1.8 版本数组中的对象，不再称之为元素对象，而是节点对象，我的个人习惯吧。</p>
+<h4 id="扩容和初始化的准备工作"><a href="#扩容和初始化的准备工作" class="headerlink" title="扩容和初始化的准备工作"></a>扩容和初始化的准备工作</h4><p>首先就是做一些准备工作，获取一些目前的数值，当前表对象这里改为了node 对象数组，然后是获取当前数组长度，然后是扩容阀值，然后声明两个变量一个是新数组长度，一个是新扩容阀值。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">final</span> Node&lt;K,V&gt;[] resize() &#123;</span><br><span class="line">  Node&lt;K,V&gt;[] oldTab = table;</span><br><span class="line">  <span class="type">int</span> <span class="variable">oldCap</span> <span class="operator">=</span> (oldTab == <span class="literal">null</span>) ? <span class="number">0</span> : oldTab.length;</span><br><span class="line">  <span class="type">int</span> <span class="variable">oldThr</span> <span class="operator">=</span> threshold;</span><br><span class="line">  <span class="type">int</span> <span class="variable">newCap</span> <span class="operator">=</span> <span class="number">0</span>;</span><br><span class="line">  <span class="type">int</span> <span class="variable">newThr</span> <span class="operator">=</span> <span class="number">0</span>;</span><br></pre></td></tr></table></figure>
+
+<p>接着走就是判断当前数组长度是否大于0，只有一种情况这个判断是false，那就是数组为未初始化的时候。这里就可以看出resize 方法不仅是数组扩容的方法，还是数组初始化的方法。具体步骤看我的代码注释吧。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 当数组有值时，也就是完成了初始化</span></span><br><span class="line"><span class="keyword">if</span> (oldCap &gt; <span class="number">0</span>) &#123;</span><br><span class="line">  <span class="comment">// 当前数组长度是否大于等于最大长度</span></span><br><span class="line">  <span class="keyword">if</span> (oldCap &gt;= MAXIMUM_CAPACITY) &#123;</span><br><span class="line">    <span class="comment">// 是则不再进行扩容，将扩容阀值改为最大值</span></span><br><span class="line">    threshold = Integer.MAX_VALUE;</span><br><span class="line">    <span class="comment">// 直接返回当前数组</span></span><br><span class="line">    <span class="keyword">return</span> oldTab;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">// 数组长度大于等于初始化长度16，并且数组长度扩大1倍也小于2^30次方</span></span><br><span class="line">  <span class="keyword">else</span> <span class="keyword">if</span> ((newCap = oldCap &lt;&lt; <span class="number">1</span>) &lt; MAXIMUM_CAPACITY &amp;&amp;</span><br><span class="line">           oldCap &gt;= DEFAULT_INITIAL_CAPACITY)</span><br><span class="line">    <span class="comment">// 新阀值扩大1倍，右移1位就是 * 2</span></span><br><span class="line">    newThr = oldThr &lt;&lt; <span class="number">1</span>; </span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 当前扩容阀值 &gt; 0，这里是没有完成初始化，但是hashMap 是通过有参构造new 出来的，而不是无参构造</span></span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (oldThr &gt; <span class="number">0</span>)</span><br><span class="line">  <span class="comment">// 则将新容量直接等于就阀值</span></span><br><span class="line">  newCap = oldThr;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 都不满足，也就是无参构造，还没有初始化</span></span><br><span class="line"><span class="keyword">else</span> &#123;</span><br><span class="line">  <span class="comment">// 新数组长度赋值16</span></span><br><span class="line">  newCap = DEFAULT_INITIAL_CAPACITY;</span><br><span class="line">  <span class="comment">// 新扩容阀值 = 0.75 * 16</span></span><br><span class="line">  newThr = (<span class="type">int</span>)(DEFAULT_LOAD_FACTOR * DEFAULT_INITIAL_CAPACITY);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 接着判断扩容阀值为0的情况下，也就是有参构造出来，就会计算出新的扩容阀值</span></span><br><span class="line"><span class="keyword">if</span> (newThr == <span class="number">0</span>) &#123;</span><br><span class="line">  <span class="type">float</span> <span class="variable">ft</span> <span class="operator">=</span> (<span class="type">float</span>)newCap * loadFactor;</span><br><span class="line">  newThr = (newCap &lt; MAXIMUM_CAPACITY &amp;&amp; ft &lt; (<span class="type">float</span>)MAXIMUM_CAPACITY ?</span><br><span class="line">            (<span class="type">int</span>)ft : Integer.MAX_VALUE);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 最后为真正的扩容阀值赋值</span></span><br><span class="line">threshold = newThr;</span><br></pre></td></tr></table></figure>
+
+<p>上面基本都是准备工作，扩容阀值和数组长度的一个计算。</p>
+<p>首先是构建出新的数组，初始化的话，这里就是16，扩容操作的话，这里就是原本数组的两倍大小。这里如果不是扩容操作的话，就直接返回了，扩容内容我们下面看详细。这里真正去读的话是一堆代码，还是要自己分步骤一点一点走才能清楚。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">Node&lt;K,V&gt;[] newTab = (Node&lt;K,V&gt;[])<span class="keyword">new</span> <span class="title class_">Node</span>[newCap];</span><br><span class="line">table = newTab;</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> (oldTab != <span class="literal">null</span>) &#123;<span class="comment">// 扩容内容，下面再看明细&#125;</span></span><br><span class="line">  </span><br><span class="line"><span class="keyword">return</span> newTab;</span><br></pre></td></tr></table></figure>
+
+<h4 id="扩容明细"><a href="#扩容明细" class="headerlink" title="扩容明细"></a>扩容明细</h4><p>在1.7 版本的扩容思路中，我们就已经知道了，扩容就是创建一个比原来数组大两倍的新数组，然后将原本数组中的数据进行重新计算下标索引，然后存入新数据中不同的位置。也就意味着有两个情况，一是：当前桶的位置只有一个元素对象，二是：当前桶的位置存在链表。1.8 版本加上了红黑树的结构，所以有了第三种情况，当前桶的位置存在红黑树结构。</p>
+<p>先看判断，然后再逐个分析判断中的内容。详细步骤看注释即可，这个不是很重要，只要记住就是分三步处理即可。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 确认原本数组中存在数据，也就是当前操作为扩容操作</span></span><br><span class="line"><span class="keyword">if</span> (oldTab != <span class="literal">null</span>) &#123;</span><br><span class="line">  <span class="comment">// 循环出数组中每一个节点对象</span></span><br><span class="line">  <span class="keyword">for</span> (<span class="type">int</span> <span class="variable">j</span> <span class="operator">=</span> <span class="number">0</span>; j &lt; oldCap; ++j) &#123;</span><br><span class="line">    <span class="comment">// 声明节点对象</span></span><br><span class="line">    Node&lt;K,V&gt; e;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 当前桶的位置节点不能为空</span></span><br><span class="line">    <span class="keyword">if</span> ((e = oldTab[j]) != <span class="literal">null</span>) &#123;</span><br><span class="line">      <span class="comment">// 原数组桶的位置节点对象置空</span></span><br><span class="line">      oldTab[j] = <span class="literal">null</span>;</span><br><span class="line">      </span><br><span class="line">      <span class="comment">// 判断当前节点对象的下个节点是否为null，是则意味着当前桶的位置只有一个元素</span></span><br><span class="line">      <span class="keyword">if</span> (e.next == <span class="literal">null</span>)</span><br><span class="line">        <span class="comment">// 此处为一个节点对象处理，后面看明细</span></span><br><span class="line">        </span><br><span class="line">      <span class="comment">// 或者当前桶的位置存在红黑树</span></span><br><span class="line">      <span class="keyword">else</span> <span class="keyword">if</span> (e <span class="keyword">instanceof</span> TreeNode)</span><br><span class="line">        <span class="comment">// 此处为红黑树处理，后面看明细</span></span><br><span class="line"> </span><br><span class="line">      <span class="comment">// 其余情况均为链表</span></span><br><span class="line">      <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">// 此处为链表处理，后面看明细</span></span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h5 id="单个节点对象处理"><a href="#单个节点对象处理" class="headerlink" title="单个节点对象处理"></a>单个节点对象处理</h5><p>这个简单，还是老套路，用当前节点对象的hash 值和数组大小 - 1来计算桶的位置（也就是下标索引），然后存入新的数组中即可。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">newTab[e.hash &amp; (newCap - <span class="number">1</span>)] = e;</span><br></pre></td></tr></table></figure>
+
+<h5 id="红黑树节点处理"><a href="#红黑树节点处理" class="headerlink" title="红黑树节点处理"></a>红黑树节点处理</h5><p>这里的话就是调用TreeNode 对象的split 方法，具体代码的话我们就不看了，我们看下其流程图，这里的主要作用还是跟上面一样，查询出每一个元素，然后重新计算下标索引，存入数组中，这里注意存入方式区别于1.7 版本的头插法，这里使用的是尾差法，也就说将每一个节点当做最后一个节点，比如：原数组的顺序是 3 -&gt; 2 -&gt; 1，那么新数组的顺序还是 3 -&gt; 2 -&gt; 1。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">((TreeNode&lt;K,V&gt;)e).split(<span class="built_in">this</span>, newTab, j, oldCap);</span><br></pre></td></tr></table></figure>
+
+<p>对于下面这个图，红黑树部分的解析中我们要注意的是链表和红黑树的相互转换，红黑树转链表的界限是：长度为6，链表转红黑树的界限是：数组长度是64、链表长度是8，这里既然存在了红黑树，那么这里的数组长度一定是大于64的。红黑树的具体查询方式还是后面算法文章再详谈。</p>
+<p><img src="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/05/04/19:28:57-image-20220504192856251.png" alt="image-20220504192856251"></p>
+<h5 id="链表节点的处理"><a href="#链表节点的处理" class="headerlink" title="链表节点的处理"></a>链表节点的处理</h5><p>链表节点的处理跟红黑树的处理差不多，区别就是少了红黑树转链表的过程，具体流程的话还是看上面的流程图。</p>
+<h5 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h5><p>其实这块的话只要记住1.8 版本和1.7 之前的区别即可，它们之前的存储没有什么太大的差入，都是用hash 值和当前数组长度计算桶的位置，然后进行存储，就是1.8 多了红黑树的数据结构。</p>
+<p>还有一点扩容方法调用的时机，1.7 代码是先扩容然后在存储数据，1.8 版本是先存储数据，再扩容。而1.8 版本的添加节点内容中，就是多了一个红黑树结构的判断和存储，还有就是链表部分需要判断当前链表是否需要转换为红黑树数据结构。</p>
+<p>其次1.8 的存储数据的尾插法也解决了并发情况下扩容时的死循环问题，但是任然不支持并发场景，因为会出现数据错乱等一系列问题。</p>
+<h3 id="删除元素方法-remove方法"><a href="#删除元素方法-remove方法" class="headerlink" title="删除元素方法-remove方法"></a>删除元素方法-remove方法</h3><p>结束了最复杂的扩容内容，后面的内容就简单了。remove 的调用就是根据提供的入参，也就是key 值来进行删除。</p>
+<p>这里就是继续调用removeEntryForKey 方法。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> V <span class="title function_">remove</span><span class="params">(Object key)</span> &#123;</span><br><span class="line">  Entry&lt;K,V&gt; e = removeEntryForKey(key);</span><br><span class="line">  <span class="keyword">return</span> (e == <span class="literal">null</span> ? <span class="literal">null</span> : e.value);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里代码很多，但是简单来说就是获取入参key 的hash 值，然后计算下表索引，找到具体桶的位置，然后循环找到真正的节点对象，判断依据就是key 值相等、key 的hash 值相等，然后集合大小减一，再判断节点对象是否是桶的位置的第一个节点，如果是则将桶位置的next 属性指向当前节点的一下个节点，反之则将上个节点的next 属性指向当前节点的一下个节点。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">final</span> Entry&lt;K,V&gt; <span class="title function_">removeEntryForKey</span><span class="params">(Object key)</span> &#123;</span><br><span class="line">  <span class="keyword">if</span> (size == <span class="number">0</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="type">int</span> <span class="variable">hash</span> <span class="operator">=</span> (key == <span class="literal">null</span>) ? <span class="number">0</span> : hash(key);</span><br><span class="line">  <span class="type">int</span> <span class="variable">i</span> <span class="operator">=</span> indexFor(hash, table.length);</span><br><span class="line">  Entry&lt;K,V&gt; prev = table[i];</span><br><span class="line">  Entry&lt;K,V&gt; e = prev;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">while</span> (e != <span class="literal">null</span>) &#123;</span><br><span class="line">    Entry&lt;K,V&gt; next = e.next;</span><br><span class="line">    Object k;</span><br><span class="line">    <span class="keyword">if</span> (e.hash == hash &amp;&amp;</span><br><span class="line">        ((k = e.key) == key || (key != <span class="literal">null</span> &amp;&amp; key.equals(k)))) &#123;</span><br><span class="line">      modCount++;</span><br><span class="line">      size--;</span><br><span class="line">      <span class="keyword">if</span> (prev == e)</span><br><span class="line">        table[i] = next;</span><br><span class="line">      <span class="keyword">else</span></span><br><span class="line">        prev.next = next;</span><br><span class="line">      e.recordRemoval(<span class="built_in">this</span>);</span><br><span class="line">      <span class="keyword">return</span> e;</span><br><span class="line">    &#125;</span><br><span class="line">    prev = e;</span><br><span class="line">    e = next;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> e;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>注意：1.8 后版本因为加了红黑树的原因，还需要考虑删除该节点元素后，红黑树的长度是否 &lt;&#x3D; 6，因为这样红黑树需要转回链表。</p>
+<h3 id="修改元素方法-还是put方法"><a href="#修改元素方法-还是put方法" class="headerlink" title="修改元素方法-还是put方法"></a>修改元素方法-还是put方法</h3><p>修改元素，这个是最简单的，就是用原本的key 在put 一次，这样就会覆盖原本节点对象的value 属性。</p>
+<h3 id="查询元素的方法-get方法"><a href="#查询元素的方法-get方法" class="headerlink" title="查询元素的方法-get方法"></a>查询元素的方法-get方法</h3><p>1.7 的话还是跟上面的删除时的查询一样，先将入参的key 值转为hash 值，然后计算出下标索引，用于找到数组中桶的位置。但是1.8 版本的代码需有红黑树的不同取值方式，简单讲就是调用TreeNode 对象的getTreeNode 方法。这里具体代码就不看了，逻辑还是比较简单的，红黑树那块的话，一时半会儿也讲不清楚，还是等后面算法文章再一起讲。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>HashMap 本身逻辑还是比较简单的，就是1.7 和1.8 之前的区别较多，1.8 不光是添加了红黑树的数据结构，还对1.7 之前的代码有一定的优化，比如存储数据的方式由之前的头插法改为了尾插法，虽然任然不支持并发的情况，但是也改善了许多。</p>
+<p>本次的重点其实还是hash 表和hashMap 本身解决hash 冲突的思路，后面Redis 也是使用相似的思路来解决这类问题。至于hashMap 的面试题我在文章最后整理一下。</p>
+<h2 id="HashMap常见面试题"><a href="#HashMap常见面试题" class="headerlink" title="HashMap常见面试题"></a>HashMap常见面试题</h2><p><strong>面试题：介绍下</strong> <strong>HashMap</strong> <strong>的底层数据结构</strong></p>
+<p>答：</p>
+<p>JDK1.8之前的HashMap数据结构：<strong>数组</strong> <strong>+</strong> <strong>链表</strong>；JDK1.8之后的HashMap数据结构：<strong>数组</strong> <strong>+</strong> <strong>链表</strong> <strong>&#x2F;</strong> <strong>红黑树</strong></p>
+<p><strong>面试题：1.8 为什么要改成“数组+链表&#x2F;红黑树”？</strong></p>
+<p>答：</p>
+<p>主要是为了提升在hash 冲突严重时（链表过长）的查找性能，使用链表的查找性能是 O(n)，而使用红黑树是 O(logn)。</p>
+<p><strong>面试题：那在什么时候用链表？什么时候用红黑树？</strong></p>
+<p>答：</p>
+<p><strong>插入：</strong>默认情况下是使用链表节点。当同一个索引位置的节点在新增后达到9个（阈值8）：如果此时数组长度大于等于 64，则会触发链表节点转红黑树节点；而如果数组长度小于64，则不会触发链表转红黑树，而是会进行扩容，因为此时的数据量还比较小。</p>
+<p><strong>移除</strong>：当同一个索引位置的节点在移除后达到 6 个，并且该索引位置的节点为红黑树节点，会触发红黑树节点转链表节点。</p>
+<p><strong>面试题：为什么链表转红黑树的阈值是8？</strong></p>
+<p>答：</p>
+<p>阈值为8是在时间和空间上权衡的结果红黑树节点大小约为链表节点的2倍，在节点太少时，红黑树的查找性能优势并不明显，付出2倍空间的代价不值得。</p>
+<p>理想情况下，使用随机的哈希码，节点分布在 hash 桶中的频率遵循泊松分布，按照泊松分布的公式计算，链表中节点个数为8时的概率为 0.00000006，这个概率足够低了，并且到8个节点时，红黑树的性能优势也会开始展现出来，因此8是一个较合理的数字。</p>
+<p><strong>面试题：为什么转回链表节点是用的6而不是复用8？</strong></p>
+<p>答：</p>
+<p>如果我们设置节点多于8个转红黑树，少于8个就马上转链表，当节点个数在8徘徊时，就会频繁进行红黑树和链表的转换，造成性能的损耗。</p>
+<p><strong>面试题：HashMap 的默认初始容量是多少？HashMap 的容量有什么限制吗？</strong></p>
+<p>答：</p>
+<p>默认初始容量是16。HashMap 的容量必须是2的N次方，HashMap 会根据我们传入的容量计算一个大于等于该容量的最小的2的N次方，例如传 9，容量为16。</p>
+<p><strong>面试题：HashMap 的容量必须是 2 的 N 次方，这是为什么？</strong></p>
+<p>答：</p>
+<p>原因 1：降低发生碰撞的概率，使散列更均匀。根据 key 的 hash 值计算 bucket 的下标位置时，使用“与”运算公式：h &amp; (length-1)，当哈希表长度为 2 的次幂时，等同于使用表长度对 hash 值取模（不信大家可以自己演算一下），散列更均匀；</p>
+<p>原因 2：表的长度为 2 的次幂，那么(length-1)的二进制最后一位一定是 1，在对 hash 值做“与”运算时，最后一位就可能为 1，也可能为 0，换句话说，取模的结果既有偶数，又有奇数。设想若(length-1)为偶数，那么“与”运算后的值只能是 0，奇数下标的 bucket 就永远散列不到，会浪费一半的空间。</p>
+<p><strong>面试题：负载因子为什么默认值是0.75。</strong></p>
+<p>答：</p>
+<p>在时间和空间上权衡的结果。如果值较高，例如1，此时会减少空间开销，但是 hash 冲突的概率会增大，增加查找成本；而如果值较低，例如 0.5 ，此时 hash 冲突会降低，但是有一半的空间会被浪费，所以折衷考虑 0.75 似乎是一个合理的值。</p>
+<p><strong>面试题：HashMap 的插入流程是怎么样的？</strong></p>
+<p>答：</p>
+<p>1.7 版本先扩容，在添加。1.8 版本先添加，再扩容。</p>
+<p>1.7 版本的添加比较简单用头插法添加，构建出一个Entry 对象，然后添加到由key 的hash 值和当前数组长度计算出的下标索引找到的桶的位置，如果是链表，则构建Entry 对象的时候其next 属性会将上个Entry 对象传入构建，简单来说就是套娃。</p>
+<p>1.8 版本的添加，还是通过key 值计算下标，找桶的位置，但是这里会判断数据结构是单个节点，还是红黑树，还是链表，如果是单个节点就直接添加；如果是红黑树则需要调用红黑树的添加方法再进行添加；如果是链表这需要将上一个节点对象的next 属性指向当前添加的节点，这就是尾插法，然后还要判断如果当前添加的节点对象是第9个的话 ，还需要将链表转为红黑树的数据结构。</p>
+<p><strong>面试题：</strong> <strong>key</strong> <strong>的</strong> <strong>hash</strong> <strong>值，是怎么设计的？</strong></p>
+<p>答：</p>
+<p>拿到 key 的 hashCode，并将 hashCode 的高16位和 hashCode 进行异或（XOR）运算，得到最终的 hash 值。</p>
+<p><strong>面试题：为什么要将 hashCode 的高16位参与运算？</strong></p>
+<p>答：</p>
+<p>减少哈希碰撞。</p>
+<p><strong>面试题：扩容（resize）流程介绍下？</strong></p>
+<p>答：</p>
+<p>这个看上面hashMap 扩容的流程小结吧。</p>
+<p><strong>面试题：对比JDK1.7 JDK 1.8 主要进行了哪些优化？</strong></p>
+<p>答：</p>
+<ol>
+<li>底层数据结构从“数组+链表”改成“数组+链表+红黑树”，主要是优化了 hash 冲突较严重时，链表过长的查找性能：O(n) -&gt; O(logn)。</li>
+<li>优化了 hash 值的计算方式，新的只是简单的让高16位参与了运算。</li>
+<li>扩容时插入方式从“头插法”改成“尾插法”，避免了并发下的死循环。</li>
+<li>扩容时计算节点在新表的索引位置方式从“h &amp; (length-1)”改成“hash &amp; oldCap”，性能可能提升不大，但设计更巧妙、更优雅。</li>
+</ol>
+<p>面试题大体就是这些，如果还有被问到其它的问题，我会在往这个文章中进行补充，先这样，本次站点到站，下车。</p>
+<h2 id="附录JDK-源码分析系列文章"><a href="#附录JDK-源码分析系列文章" class="headerlink" title="附录JDK 源码分析系列文章"></a>附录JDK 源码分析系列文章</h2><table>
+<thead>
+<tr>
+<th align="left">时间</th>
+<th>文章</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">2022-04-25</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/04/25/JDK-1/#more">Object、ArrayList以及LinkedList源码分析</a></td>
+</tr>
+<tr>
+<td align="left">2022-04-27</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/04/27/JDK-2/#more">HsahMap的面试详解及源码分析</a></td>
+</tr>
+</tbody></table>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/JDK/" rel="tag"># JDK</a>
+              <a href="/tags/HashMap/" rel="tag"># HashMap</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2022/04/25/JDK-1/" rel="prev" title="Object、ArrayList以及LinkedList源码分析">
+                  <i class="fa fa-chevron-left"></i> Object、ArrayList以及LinkedList源码分析
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2022/04/30/Redis-1/" rel="next" title="Redis实现分布式锁流程分析">
+                  Redis实现分布式锁流程分析 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">李万青</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/next-boot.js"></script>
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+</body>
+</html>

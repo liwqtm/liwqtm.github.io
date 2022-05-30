@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 6.2.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css" integrity="sha256-DfWjNxDkM94fVBWx1H5BMMp0Zq7luBlV8QRcSES7s+0=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"example.com","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.11.1","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12},"copycode":{"enable":false,"style":null},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="本次文章就算是开始对于aop 的流程源码分析了。区别于IOC，aop 相对来说简单一点，我们后续的主要内容就是从aop 相关配置信息的解析、代理的创建、代理流程的调用，这三个部分着手来简单说一下aop 的源码分析。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="AOP流程源码分析-配置信息解析和代理对象创建">
+<meta property="og:url" content="http://example.com/2022/03/19/Spring%20AOP-1/index.html">
+<meta property="og:site_name" content="茯楚博客">
+<meta property="og:description" content="本次文章就算是开始对于aop 的流程源码分析了。区别于IOC，aop 相对来说简单一点，我们后续的主要内容就是从aop 相关配置信息的解析、代理的创建、代理流程的调用，这三个部分着手来简单说一下aop 的源码分析。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/04/28/15:46:05-image-20220428154603852.png">
+<meta property="og:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/04/28/16:06:24-image-20220428160623332.png">
+<meta property="article:published_time" content="2022-03-18T16:00:00.000Z">
+<meta property="article:modified_time" content="2022-05-09T08:37:31.372Z">
+<meta property="article:author" content="李万青">
+<meta property="article:tag" content="框架">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="Spring">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/04/28/15:46:05-image-20220428154603852.png">
+
+
+<link rel="canonical" href="http://example.com/2022/03/19/Spring%20AOP-1/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://example.com/2022/03/19/Spring%20AOP-1/","path":"2022/03/19/Spring AOP-1/","title":"AOP流程源码分析-配置信息解析和代理对象创建"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>AOP流程源码分析-配置信息解析和代理对象创建 | 茯楚博客</title>
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">茯楚博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">记录整理技术文章</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AE%80%E8%BF%B0AOP%E7%9A%84%E5%89%8D%E4%B8%96%E4%BB%8A%E7%94%9F"><span class="nav-number">1.</span> <span class="nav-text">简述AOP的前世今生</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90"><span class="nav-number">2.</span> <span class="nav-text">源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#AOP%E9%85%8D%E7%BD%AE%E4%BF%A1%E6%81%AF%E8%A7%A3%E6%9E%90"><span class="nav-number">2.1.</span> <span class="nav-text">AOP配置信息解析</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%B0%8F%E7%BB%93"><span class="nav-number">2.1.1.</span> <span class="nav-text">小结</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#AOP%E5%AF%B9%E5%BA%94%E7%9A%84BeanPostProcessor%E7%9A%84%E6%89%A7%E8%A1%8C"><span class="nav-number">2.2.</span> <span class="nav-text">AOP对应的BeanPostProcessor的执行</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%89%8D%E7%BD%AE%E6%96%B9%E6%B3%95%E8%A7%A3%E6%9E%90%E6%89%80%E6%9C%89%E7%9A%84advisor-postProcessBeforeInitialization%E6%96%B9%E6%B3%95"><span class="nav-number">2.2.1.</span> <span class="nav-text">前置方法解析所有的advisor-postProcessBeforeInitialization方法</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%90%8E%E7%BD%AE%E6%96%B9%E6%B3%95%E7%94%9F%E6%88%90%E4%BB%A3%E7%90%86%E5%AF%B9%E8%B1%A1-postProcessAfterInitialization%E6%96%B9%E6%B3%95"><span class="nav-number">2.2.2.</span> <span class="nav-text">后置方法生成代理对象-postProcessAfterInitialization方法</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%B0%8F%E7%BB%93-1"><span class="nav-number">2.2.3.</span> <span class="nav-text">小结</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">3.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%99%84%E5%BD%95Spring-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E7%B3%BB%E5%88%97%E6%96%87%E7%AB%A0"><span class="nav-number">4.</span> <span class="nav-text">附录Spring 源码分析系列文章</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#IOC"><span class="nav-number">4.1.</span> <span class="nav-text">IOC</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#AOP"><span class="nav-number">4.2.</span> <span class="nav-text">AOP</span></a></li></ol></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="李万青"
+      src="/images/8a06cd0a8da6a6848b7a0b37b32164b7.jpeg">
+  <p class="site-author-name" itemprop="name">李万青</p>
+  <div class="site-description" itemprop="description">苦心人天不负</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">14</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/liwqtm/liwqtm.github.io" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;liwqtm&#x2F;liwqtm.github.io" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll site-overview-item animated">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/m0_51464746?type=blog" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;m0_51464746?type&#x3D;blog" rel="noopener" target="_blank">张怀猛的博客</a>
+        </li>
+    </ul>
+  </div>
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2022/03/19/Spring%20AOP-1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/8a06cd0a8da6a6848b7a0b37b32164b7.jpeg">
+      <meta itemprop="name" content="李万青">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="茯楚博客">
+      <meta itemprop="description" content="苦心人天不负">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="AOP流程源码分析-配置信息解析和代理对象创建 | 茯楚博客">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          AOP流程源码分析-配置信息解析和代理对象创建
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2022-03-19 00:00:00" itemprop="dateCreated datePublished" datetime="2022-03-19T00:00:00+08:00">2022-03-19</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-05-09 16:37:31" itemprop="dateModified" datetime="2022-05-09T16:37:31+08:00">2022-05-09</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Java%E6%A1%86%E6%9E%B6/" itemprop="url" rel="index"><span itemprop="name">Java框架</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Java%E6%A1%86%E6%9E%B6/Spring/" itemprop="url" rel="index"><span itemprop="name">Spring</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>本次文章就算是开始对于aop 的流程源码分析了。区别于IOC，aop 相对来说简单一点，我们后续的主要内容就是从aop 相关配置信息的解析、代理的创建、代理流程的调用，这三个部分着手来简单说一下aop 的源码分析。<span id="more"></span></p>
+<h2 id="简述AOP的前世今生"><a href="#简述AOP的前世今生" class="headerlink" title="简述AOP的前世今生"></a>简述AOP的前世今生</h2><p>首先系列文章开头还老套路，先说一下aop 的一些概念知识，其信息来源主还要是网络和官方。对aop 有一定了解的跳过这段内容。</p>
+<ol>
+<li>AOP（Aspect Orient Programming）：面向切面编程；</li>
+<li>用途：用于系统中的横切关注点，比如日志管理，事务管理；</li>
+<li>实现：利用代理模式，通过代理对象，对被代理的对象增加功能。所以，关键在于AOP 框架自动创建AOP 代理对象，代理模式分为静态代理和动态代理；</li>
+<li>框架：<br> AspectJ使用静态代理，编译时增强，在编译期生成代理对象；<br> SpringAOP使用动态代理，运行时增强，在运行时，动态生成代理对象；</li>
+</ol>
+<p>目前 Spring AOP 一共有三种配置方式，Spring 做到了很好地向下兼容，所以可以放心使用。</p>
+<ul>
+<li>Spring 1.2 基于接口的配置：最早的 Spring AOP 是完全基于几个接口的</li>
+<li>Spring 2.0 schema-based 配置：Spring 2.0 以后使用 XML 的方式来配置，使用 命名空间 <aop /></li>
+<li>Spring 2.0 <strong>@AspectJ</strong> <strong>配置</strong>：使用注解的方式来配置，这种方式感觉是最方便的，还有，这里虽然叫做@AspectJ ，但是这个和AspectJ 其实没啥关系。</li>
+</ul>
+<p>要说明的是，这里介绍的 Spring AOP 是纯的 Spring 代码，和 AspectJ 没什么关系，但是 Spring 延用了 AspectJ 中的概念，包括使用了AspectJ 提供的 jar 包中的注解，但是不依赖于其实现功能。如@Aspect、@Pointcut、@Before、@After 等注解都是来自于AspectJ，但是功能的实现还是Spring AOP 自己实现的。</p>
+<p>Spring AOP 底层实现机制目前有两种：JDK 动态代理、CGLIB 动态字节码生成。在阅读源码前对这两种机制的使用有个认识，有利于更好的理解源码。</p>
+<h2 id="源码分析"><a href="#源码分析" class="headerlink" title="源码分析"></a>源码分析</h2><p>源码的话，还是用之前分析IOC 的时候使用的源码，然后创建一个测试类。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> &#123;</span><br><span class="line"></span><br><span class="line">  <span class="type">ClassPathXmlApplicationContext</span> <span class="variable">applicationContext</span> <span class="operator">=</span></span><br><span class="line">    <span class="keyword">new</span> <span class="title class_">ClassPathXmlApplicationContext</span>(<span class="string">&quot;classpath:applicationContext-aop.xml&quot;</span>);</span><br><span class="line"></span><br><span class="line">  <span class="type">UserService</span> <span class="variable">userService</span> <span class="operator">=</span> (UserService) applicationContext.getBean(<span class="string">&quot;userServiceImpl&quot;</span>);</span><br><span class="line">  userService.findAll();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我们今天主要源码分析目的就是测试类中applicationContext 的创建，也就是容器启动时候的内容，后面再说具体方法的调用。</p>
+<p>因为之前说IOC 就已经将核心方法refresh 方法全部分析过一次了，对于IOC 没有了解的小伙伴可以从IOC 的第二篇文章：<a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/11/Spring%20IOC-2/#more">IOC流程解析-BeanFactory的创建</a> 开始看一下。既然看过了，那么我们就直接定位到具体方法。</p>
+<h3 id="AOP配置信息解析"><a href="#AOP配置信息解析" class="headerlink" title="AOP配置信息解析"></a>AOP配置信息解析</h3><p>首先aop 的标签设置和bean 标签有点不一样，所以我们要看的话，就是先从标签的解析内容开始，即BeanDefinition 的构建。</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">beans</span> <span class="attr">xmlns</span>=<span class="string">&quot;http://www.springframework.org/schema/beans&quot;</span></span></span><br><span class="line"><span class="tag">	   <span class="attr">xmlns:xsi</span>=<span class="string">&quot;http://www.w3.org/2001/XMLSchema-instance&quot;</span></span></span><br><span class="line"><span class="tag">	   <span class="attr">xmlns:context</span>=<span class="string">&quot;http://www.springframework.org/schema/context&quot;</span></span></span><br><span class="line"><span class="tag">	   <span class="attr">xmlns:aop</span>=<span class="string">&quot;http://www.springframework.org/schema/aop&quot;</span></span></span><br><span class="line"><span class="tag">	   <span class="attr">xsi:schemaLocation</span>=<span class="string">&quot;http://www.springframework.org/schema/beans&quot;</span></span></span><br><span class="line"><span class="tag">		<span class="attr">http:</span>//<span class="attr">www.springframework.org</span>/<span class="attr">schema</span>/<span class="attr">beans</span>/<span class="attr">spring-beans.xsd</span></span></span><br><span class="line"><span class="tag">		<span class="attr">http:</span>//<span class="attr">www.springframework.org</span>/<span class="attr">schema</span>/<span class="attr">context</span></span></span><br><span class="line"><span class="tag">		<span class="attr">http:</span>//<span class="attr">www.springframework.org</span>/<span class="attr">schema</span>/<span class="attr">context</span>/<span class="attr">spring-context.xsd</span></span></span><br><span class="line"><span class="tag">		<span class="attr">http:</span>//<span class="attr">www.springframework.org</span>/<span class="attr">schema</span>/<span class="attr">aop</span></span></span><br><span class="line"><span class="tag">		<span class="attr">http:</span>//<span class="attr">www.springframework.org</span>/<span class="attr">schema</span>/<span class="attr">aop</span>/<span class="attr">spring-aop.xsd</span>&gt;</span></span><br><span class="line">		</span><br><span class="line">	<span class="tag">&lt;<span class="name">context:component-scan</span> <span class="attr">base-package</span>=<span class="string">&quot;com.itheima&quot;</span>/&gt;</span></span><br><span class="line">	</span><br><span class="line">	<span class="comment">&lt;!--@EnableAspectJAutoProxy--&gt;</span></span><br><span class="line">	<span class="tag">&lt;<span class="name">aop:aspectj-autoproxy</span> /&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">beans</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>这里就直接定位到代码了，parseBeanDefinitions 方法（这里全局搜索就行，具体怎么找到还是看IOC 的第二篇文章），这里可以看到的是会有两个解析方法的分支，这个我们之前也解释过spring 的schema 机制，所以aop 标签走的应该是第二个方法parseCustomElement 方法。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (node <span class="keyword">instanceof</span> Element) &#123;</span><br><span class="line">  <span class="type">Element</span> <span class="variable">ele</span> <span class="operator">=</span> (Element) node;</span><br><span class="line">  <span class="comment">//下面有两个分支</span></span><br><span class="line">  <span class="keyword">if</span> (delegate.isDefaultNamespace(ele)) &#123;</span><br><span class="line">    <span class="comment">// 1.1 默认命名空间节点的处理，例如： &lt;bean id=&quot;test&quot; class=&quot;&quot; /&gt;</span></span><br><span class="line">    <span class="comment">//分支1：代表解析标准元素 &lt;import /&gt;、&lt;alias /&gt;、&lt;bean /&gt;、&lt;beans /&gt; 这几个</span></span><br><span class="line">    <span class="comment">//标准节点</span></span><br><span class="line">    parseDefaultElement(ele, delegate);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">else</span> &#123;</span><br><span class="line">    <span class="comment">// 1.2 自定义命名空间节点的处理，例如：&lt;context:component-scan/&gt;、&lt;aop:aspectj-autoproxy/&gt;</span></span><br><span class="line">    <span class="comment">//分支2：代表解析 &lt;mvc /&gt;、&lt;task /&gt;、&lt;context /&gt;、&lt;aop /&gt; 、&lt;component-scan /&gt;等</span></span><br><span class="line">    <span class="comment">//特殊节点</span></span><br><span class="line">    delegate.parseCustomElement(ele);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>跟进方法。</p>
+<p>这里的第一个重点就是去获取一个命名空间处理器，而之前介绍schema 机制的时候，就已经说过这个解析器是由对应的标签设置提供的，所以我们要找到aop 对应的“<a target="_blank" rel="noopener" href="http://www.springframework.org/schema/aop%E2%80%9D">http://www.springframework.org/schema/aop”</a> 标识后，再去根据标识找到对应的spring.handlers 文件。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//解析命名空间，得到一个命名空间处理器</span></span><br><span class="line"><span class="comment">//重点</span></span><br><span class="line"><span class="type">NamespaceHandler</span> <span class="variable">handler</span> <span class="operator">=</span> <span class="built_in">this</span>.readerContext.getNamespaceHandlerResolver().resolve(namespaceUri);</span><br><span class="line"><span class="comment">//开始解析</span></span><br><span class="line"><span class="comment">//主线 重点</span></span><br><span class="line"><span class="keyword">return</span> handler.parse(ele, <span class="keyword">new</span> <span class="title class_">ParserContext</span>(<span class="built_in">this</span>.readerContext, <span class="built_in">this</span>, containingBd));</span><br></pre></td></tr></table></figure>
+
+<p>要是全局搜索不好找，因为可能有很多配置文件都引入了aop，那么可以直接在xml 中点击标识，跳转到对应的jar 包下面，再去找inf 文件夹下面对应的spring.handlers 文件</p>
+<img src="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/04/28/15:46:05-image-20220428154603852.png" alt="image-20220428154603852" style="zoom: 80%;" />
+
+<p>这里文件中就存放这aop 标签的解析器。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">http\:<span class="comment">//www.springframework.org/schema/aop=org.springframework.aop.config.AopNamespaceHandler</span></span><br></pre></td></tr></table></figure>
+
+<p>接着直接跟进AopNamespaceHandler 类。</p>
+<p>可以看到关于各个标签不同解析器的生成，我们上面配置的是aop 的基础标签aspectj-autoproxy 标签，所以直接找到对应的AspectJAutoProxyBeanDefinitionParser 类。至于这个init 方法是什么时候调用的，我们继续往下看。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">public class AopNamespaceHandler extends NamespaceHandlerSupport &#123;</span><br><span class="line"></span><br><span class="line">	@Override</span><br><span class="line">	public void init() &#123;</span><br><span class="line">		// In 2.0 XSD as well as in 2.5+ XSDs</span><br><span class="line">		registerBeanDefinitionParser(&quot;config&quot;, new ConfigBeanDefinitionParser());</span><br><span class="line">		registerBeanDefinitionParser(&quot;aspectj-autoproxy&quot;, new AspectJAutoProxyBeanDefinitionParser());</span><br><span class="line">		registerBeanDefinitionDecorator(&quot;scoped-proxy&quot;, new ScopedProxyBeanDefinitionDecorator());</span><br><span class="line"></span><br><span class="line">		// Only in 2.0 XSD: moved to context namespace in 2.5+</span><br><span class="line">		registerBeanDefinitionParser(&quot;spring-configured&quot;, new SpringConfiguredBeanDefinitionParser());</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>回到parseCustomElement 方法，跟进其resolve 方法。</p>
+<p>我们可以看到init 方法就是这个时机点调用的，也就说这里对创建出不同的解析器对象，然后返回。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">NamespaceHandler</span> <span class="variable">namespaceHandler</span> <span class="operator">=</span> (NamespaceHandler) BeanUtils.instantiateClass(handlerClass);</span><br><span class="line">namespaceHandler.init();</span><br><span class="line">handlerMappings.put(namespaceUri, namespaceHandler);</span><br><span class="line"><span class="keyword">return</span> namespaceHandler;</span><br></pre></td></tr></table></figure>
+
+<p>再次回到parseCustomElement 方法。</p>
+<p>既然已经知道了目前的解析器是AspectJAutoProxyBeanDefinitionParser 对象，那么我们就可以继续跟进其parse 方法。</p>
+<p>跟进方法。我们重点要看的就是第一个注册AspectJAnnotationAutoProxyCreator 方法。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="meta">@Nullable</span></span><br><span class="line"><span class="keyword">public</span> BeanDefinition <span class="title function_">parse</span><span class="params">(Element element, ParserContext parserContext)</span> &#123;</span><br><span class="line">  <span class="comment">// 1.注册AspectJAnnotationAutoProxyCreator</span></span><br><span class="line">  AopNamespaceUtils.registerAspectJAnnotationAutoProxyCreatorIfNecessary(parserContext, element);</span><br><span class="line">  <span class="comment">// 2.对于注解中子节点的处理</span></span><br><span class="line">  extendBeanDefinition(element, parserContext);</span><br><span class="line">  <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>继续跟进。</p>
+<p>这里的目的就是在BeanFactory 中注册AnnotationAwareAspectJAutoProxyCreator 对象。注意这里不是注册到单例池之中，具体是为什么，往下看。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">registerAspectJAnnotationAutoProxyCreatorIfNecessary</span><span class="params">(</span></span><br><span class="line"><span class="params">  ParserContext parserContext, Element sourceElement)</span> &#123;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 1.注册AnnotationAwareAspectJAutoProxyCreator</span></span><br><span class="line">  <span class="type">BeanDefinition</span> <span class="variable">beanDefinition</span> <span class="operator">=</span> AopConfigUtils.registerAspectJAnnotationAutoProxyCreatorIfNecessary(</span><br><span class="line">    parserContext.getRegistry(), parserContext.extractSource(sourceElement));</span><br><span class="line">  <span class="comment">// 2.对于proxy-target-class以及expose-proxy属性的处理</span></span><br><span class="line">  useClassProxyingIfNecessary(parserContext.getRegistry(), sourceElement);</span><br><span class="line">  <span class="comment">// 3.注册组件并通知，便于监听器做进一步处理</span></span><br><span class="line">  registerComponentIfNecessary(beanDefinition, parserContext);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我们可以看下AnnotationAwareAspectJAutoProxyCreator 对象的结构。</p>
+<p><img src="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/04/28/16:06:24-image-20220428160623332.png" alt="image-20220428160623332"></p>
+<p>这个对象的顶层接口是BeanPostProcessor 接口，这说明该对象为一个Bean 的后置处理器对象。所以在BeanFactory 中注册的话，不是注册到单力池中，而是注册到BeanPostProcessor 的集合中。</p>
+<h4 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h4><p>这里的aop 标签解析就是这样，目的就是往BeanPostProcessor 集合中注册第一个Bean 的后置处理器。</p>
+<h3 id="AOP对应的BeanPostProcessor的执行"><a href="#AOP对应的BeanPostProcessor的执行" class="headerlink" title="AOP对应的BeanPostProcessor的执行"></a>AOP对应的BeanPostProcessor的执行</h3><p>在上面我们看到已经构建出了AOP 相关的BeanPostProcessor，那么下一步就是要看这些Bean 的后置处理器的执行，所以我们直接定位到Bean 的初始化内容doCreateBean 方法。</p>
+<p>定位到该方法后直接找到对应的BeanPostProcessor 执行的相关内容initializeBean 方法的调用。</p>
+<h4 id="前置方法解析所有的advisor-postProcessBeforeInitialization方法"><a href="#前置方法解析所有的advisor-postProcessBeforeInitialization方法" class="headerlink" title="前置方法解析所有的advisor-postProcessBeforeInitialization方法"></a>前置方法解析所有的advisor-postProcessBeforeInitialization方法</h4><p>跟进该方法。第一个前置方法的调用 ，还是继续跟进applyBeanPostProcessorsBeforeInitialization 方法。不过该方法我们之前已经看过多次了，没什么内容，就是循环出所有的BeanPostProcessor 然后执行对应的postProcessBeforeInitialization 方法。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">Object</span> <span class="variable">wrappedBean</span> <span class="operator">=</span> bean;</span><br><span class="line"><span class="keyword">if</span> (mbd == <span class="literal">null</span> || !mbd.isSynthetic()) &#123;</span><br><span class="line">  <span class="comment">// 2.在初始化前应用BeanPostProcessor的postProcessBeforeInitialization方法，允许对bean实例进行包装</span></span><br><span class="line">  wrappedBean = applyBeanPostProcessorsBeforeInitialization(wrappedBean, beanName);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我们直接跟进上面构建的AnnotationAwareAspectJAutoProxyCreator 对象的Before 方法，注意这里跟进去就是其上父类AbstractAutoProxyCreator 对象的实现，因为该对象是没有对Before 方法进行实现的。</p>
+<p>跟进代码。找到其重点调用shouldSkip 方法，注意Before 方法是不是创建出代理对象的，但是会加载所有的Advisor。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (isInfrastructureClass(beanClass) || shouldSkip(beanClass, beanName)) &#123;</span><br><span class="line">  <span class="built_in">this</span>.advisedBeans.put(cacheKey, Boolean.FALSE);</span><br><span class="line">  <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>继续跟进。注意这里要跟进后找到其对应的子类重写。然后找到重点方法findCandidateAdvisors方法调用</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">List&lt;Advisor&gt; candidateAdvisors = findCandidateAdvisors();</span><br></pre></td></tr></table></figure>
+
+<p>还是跟进。还是找其对应的子类重写。</p>
+<p>这里会首先根据父类规则找到的所有advisor，但是这里是没有的，也就是null，所以要看的是buildAspectJAdvisors 方法的调用。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="keyword">protected</span> List&lt;Advisor&gt; <span class="title function_">findCandidateAdvisors</span><span class="params">()</span> &#123;</span><br><span class="line">  <span class="comment">// Add all the Spring advisors found according to superclass rules.</span></span><br><span class="line">  <span class="comment">// 1.添加根据父类规则找到的所有advisor</span></span><br><span class="line">  List&lt;Advisor&gt; advisors = <span class="built_in">super</span>.findCandidateAdvisors();</span><br><span class="line">  <span class="comment">// Build Advisors for all AspectJ aspects in the bean factory.</span></span><br><span class="line">  <span class="comment">// 2.为bean工厂中的所有AspectJ方面构建advisor</span></span><br><span class="line">  <span class="keyword">if</span> (<span class="built_in">this</span>.aspectJAdvisorsBuilder != <span class="literal">null</span>) &#123;</span><br><span class="line">    advisors.addAll(<span class="built_in">this</span>.aspectJAdvisorsBuilder.buildAspectJAdvisors());</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> advisors;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>跟进方法。</p>
+<p>首先会获取一次所有的advisors 对象缓存，如果已经有值就直接返回，如果没有值才会进行解析，目的就是为了只解析一次，因为所有的bean 初始化都会走这个BeanPostProcessor，所以要避免重复解析。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">List&lt;String&gt; aspectNames = <span class="built_in">this</span>.aspectBeanNames;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 1.如果aspectNames为空，则进行解析</span></span><br><span class="line"><span class="keyword">if</span> (aspectNames == <span class="literal">null</span>) &#123;</span><br></pre></td></tr></table></figure>
+
+<p>然后是获取所有的beanName，循环遍历。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 1.1 获取所有的beanName</span></span><br><span class="line">String[] beanNames = BeanFactoryUtils.beanNamesForTypeIncludingAncestors(</span><br><span class="line">  <span class="built_in">this</span>.beanFactory, Object.class, <span class="literal">true</span>, <span class="literal">false</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 1.2 循环遍历所有的beanName，找出对应的增强方法</span></span><br><span class="line"><span class="keyword">for</span> (String beanName : beanNames) &#123;</span><br></pre></td></tr></table></figure>
+
+<p>第一个重点来了，一定是要被Aspect 注解修改的接口，才会被构建成advisor 对象。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 1.4 如果beanType存在Aspect注解则进行处理</span></span><br><span class="line"><span class="keyword">if</span> (<span class="built_in">this</span>.advisorFactory.isAspect(beanType)) &#123;</span><br></pre></td></tr></table></figure>
+
+<p>第二个重点，调用getAdvisors 方法获取由当前对象的所有方法封装而来的Advisor 对象集合。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 使用BeanFactory和beanName创建一个BeanFactoryAspectInstanceFactory，主要用来创建切面对象实例</span></span><br><span class="line"><span class="type">MetadataAwareAspectInstanceFactory</span> <span class="variable">factory</span> <span class="operator">=</span></span><br><span class="line">  <span class="keyword">new</span> <span class="title class_">BeanFactoryAspectInstanceFactory</span>(<span class="built_in">this</span>.beanFactory, beanName);</span><br><span class="line"><span class="comment">// 1.5 解析标记AspectJ注解中的增强方法===》》》》</span></span><br><span class="line">List&lt;Advisor&gt; classAdvisors = <span class="built_in">this</span>.advisorFactory.getAdvisors(factory);</span><br></pre></td></tr></table></figure>
+
+<p>跟进getAdvisors 方法，看下具体封装内容。</p>
+<p>这里是根据方法上修饰的不同注解，来封装成不同的Advisor 对象。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 2.获取Aspect()标注的类名</span></span><br><span class="line"><span class="type">String</span> <span class="variable">aspectName</span> <span class="operator">=</span> aspectInstanceFactory.getAspectMetadata().getAspectName();</span><br><span class="line"></span><br><span class="line"><span class="comment">// 5.获取切面类中的方法（也就是我们用来进行逻辑增强的方法，被@Around、@After等注解修饰的方法，使用@Pointcut的方法不处理）==&gt;</span></span><br><span class="line"><span class="keyword">for</span> (Method method : getAdvisorMethods(aspectClass)) &#123;</span><br><span class="line">  <span class="comment">// 6.处理method，获取增强器==&gt;</span></span><br><span class="line">  <span class="type">Advisor</span> <span class="variable">advisor</span> <span class="operator">=</span> getAdvisor(method, lazySingletonAspectInstanceFactory, <span class="number">0</span>, aspectName);</span><br><span class="line">  <span class="keyword">if</span> (advisor != <span class="literal">null</span>) &#123;</span><br><span class="line">    <span class="comment">// 7.如果增强器不为空，则添加到advisors</span></span><br><span class="line">    advisors.add(advisor);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>继续跟进就没有必要了，我们看下大致的写法。</p>
+<p>首先是@Aspect 注解修饰类，说明这个类是切面类，可以被aop 找到</p>
+<p>然后是@Pointcut 注解修改第一个方法，所有需要被拦截的具体对象</p>
+<p>最后就是@Before 注解修改前置方法、@After 注解修饰后置方法、@Around 注解修改环绕方法。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Component</span></span><br><span class="line"><span class="meta">@Aspect</span> <span class="comment">// 切面</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">AopAspect</span> &#123;</span><br><span class="line">  </span><br><span class="line">	<span class="meta">@Pointcut(&quot;execution(* com.itheima.service..*.*(..))&quot;)</span></span><br><span class="line">	<span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">pointcut</span><span class="params">()</span> &#123;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="meta">@Before(&quot;pointcut()&quot;)</span></span><br><span class="line">	<span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">before</span><span class="params">()</span> &#123;</span><br><span class="line">		System.out.println(<span class="string">&quot;before&quot;</span>);</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="meta">@After(&quot;pointcut()&quot;)</span></span><br><span class="line">	<span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">after</span><span class="params">()</span> &#123;</span><br><span class="line">		System.out.println(<span class="string">&quot;after&quot;</span>);</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="meta">@Around(&quot;pointcut()&quot;)</span></span><br><span class="line">	<span class="keyword">public</span> Object <span class="title function_">around</span><span class="params">(ProceedingJoinPoint proceedingJoinPoint)</span> <span class="keyword">throws</span> InterruptedException &#123;</span><br><span class="line">		System.out.println(<span class="string">&quot;around advice start&quot;</span>);</span><br><span class="line">		<span class="keyword">try</span> &#123;</span><br><span class="line">			<span class="type">Object</span> <span class="variable">result</span> <span class="operator">=</span> proceedingJoinPoint.proceed();</span><br><span class="line">			System.out.println(<span class="string">&quot;around advice end&quot;</span>);</span><br><span class="line">			<span class="keyword">return</span> result;</span><br><span class="line">		&#125; <span class="keyword">catch</span> (Throwable throwable) &#123;</span><br><span class="line">			throwable.printStackTrace();</span><br><span class="line">			<span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="后置方法生成代理对象-postProcessAfterInitialization方法"><a href="#后置方法生成代理对象-postProcessAfterInitialization方法" class="headerlink" title="后置方法生成代理对象-postProcessAfterInitialization方法"></a>后置方法生成代理对象-postProcessAfterInitialization方法</h4><p>还是回到AbstractAutoProxyCreator 对象，直接找到postProcessAfterInitialization 方法。</p>
+<p>跟进代码。</p>
+<p>首先是生成用于缓存的key，然后调用wrapIfNecessary 方法。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//2.如果beanName为空，使用Class对象作为缓存的key</span></span><br><span class="line"><span class="type">Object</span> <span class="variable">cacheKey</span> <span class="operator">=</span> getCacheKey(bean.getClass(), beanName);</span><br><span class="line"><span class="comment">// 1.判断当前bean是否需要被代理，如果需要则进行封装</span></span><br><span class="line"><span class="keyword">if</span> (<span class="built_in">this</span>.earlyProxyReferences.remove(cacheKey) != bean) &#123;</span><br><span class="line">  <span class="keyword">return</span> wrapIfNecessary(bean, beanName, cacheKey);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>继续跟进。</p>
+<p>这里先获取到上面解析缓存的所有Advisors，我们可以先看下getAdvicesAndAdvisorsForBean 方法。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">// 4.获取当前bean的Advices和Advisors===》</span><br><span class="line">Object[] specificInterceptors = getAdvicesAndAdvisorsForBean(bean.getClass(), beanName, null);</span><br></pre></td></tr></table></figure>
+
+<p>跟进后直接就是重点调用findCandidateAdvisors 方法，这里我们就不看了，直接再次跟进。</p>
+<p>这部分可以看到，第一步是获取所有的Advisor 对象，然后筛选出拦截本对象的Advisor。注意我们目前还是在Bean 对象的初始化过程中，那么这里指的对象就是正在初始化的对象。最后再将符合条件的Advisor 对象排个序即可，这里的排序是为了将环绕、前置、后置方法进行排序，方便后面代理对象执行时的调用顺序。</p>
+<p>至于findCandidateAdvisors 方法，这里跟上面的调用时一模一样的，唯一的不同就是这次不用再次解析了，而是直接返回上面的缓存集合即可。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">protected</span> List&lt;Advisor&gt; <span class="title function_">findEligibleAdvisors</span><span class="params">(Class&lt;?&gt; beanClass, String beanName)</span> &#123;</span><br><span class="line">  <span class="comment">// 1.查找所有的候选Advisor</span></span><br><span class="line">  <span class="comment">//将所有拥有@Aspect注解的类转换为advisors（aspectJAdvisorsBuilder.buildAspectJAdvisors）</span></span><br><span class="line">  <span class="comment">// 2.从所有候选的Advisor中找出符合条件的</span></span><br><span class="line">  List&lt;Advisor&gt; candidateAdvisors = findCandidateAdvisors();</span><br><span class="line">  List&lt;Advisor&gt; eligibleAdvisors = findAdvisorsThatCanApply(candidateAdvisors, beanClass, beanName);</span><br><span class="line">  <span class="comment">// 3.扩展方法，留个子类实现</span></span><br><span class="line">  extendAdvisors(eligibleAdvisors);</span><br><span class="line">  <span class="keyword">if</span> (!eligibleAdvisors.isEmpty()) &#123;</span><br><span class="line">    <span class="comment">// 4.对符合条件的Advisor进行排序</span></span><br><span class="line">    eligibleAdvisors = sortAdvisors(eligibleAdvisors);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> eligibleAdvisors;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>回到wrapIfNecessary 方法。</p>
+<p>继续就是创建代理的部分了，最后会将创建好的代理存入缓存，并且返回结果，这个方法后面我们就不再回来了，要看好。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 5.如果存在增强器则创建代理</span></span><br><span class="line"><span class="keyword">if</span> (specificInterceptors != DO_NOT_PROXY) &#123;</span><br><span class="line">  <span class="built_in">this</span>.advisedBeans.put(cacheKey, Boolean.TRUE);</span><br><span class="line">  <span class="comment">// 5.1 创建代理对象：这边SingletonTargetSource的target属性存放的就是我们原来的bean实例（也就是被代理对象），</span></span><br><span class="line">  <span class="comment">// 用于最后增加逻辑执行完毕后，通过反射执行我们真正的方法时使用（method.invoke(bean, args)）</span></span><br><span class="line">  <span class="type">Object</span> <span class="variable">proxy</span> <span class="operator">=</span> createProxy(</span><br><span class="line">    bean.getClass(), beanName, specificInterceptors, <span class="keyword">new</span> <span class="title class_">SingletonTargetSource</span>(bean));</span><br><span class="line">  <span class="comment">// 5.2 创建完代理后，将cacheKey -&gt; 代理类的class放到缓存</span></span><br><span class="line">  <span class="built_in">this</span>.proxyTypes.put(cacheKey, proxy.getClass());</span><br><span class="line">  <span class="comment">// 返回代理对象</span></span><br><span class="line">  <span class="keyword">return</span> proxy;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>继续跟进createProxy 方法。</p>
+<p>这里的代码多，可以都不用管，就看后面的最后一句。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">proxyFactory.getProxy(getProxyClassLoader());</span><br></pre></td></tr></table></figure>
+
+<p>跟进代码。</p>
+<p>不要急着看getProxy，先看createAopProxy 方法。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> Object <span class="title function_">getProxy</span><span class="params">(<span class="meta">@Nullable</span> ClassLoader classLoader)</span> &#123;</span><br><span class="line">  <span class="comment">// 1.createAopProxy：创建AopProxy</span></span><br><span class="line">  <span class="comment">// 2.getProxy(classLoader)：获取代理对象实例</span></span><br><span class="line">  <span class="keyword">return</span> createAopProxy().getProxy(classLoader);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里的调用比较简单，我就不一步步跟了，直接看结果。</p>
+<p>这里会判断出使用的到底是Cglib 代理还是JDK 代理。直接说结论就是默认使用JDK 代理，配置了使用Cglib 代理。JDK 代理对应对象：JdkDynamicAopProxy，Cglib 代理对应对象：ObjenesisCglibAopProxy。这里一定要记住这个两个代理对应的对象，后面我们走流程的时候，看代理直接看对应对象的invoke 方法。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="keyword">public</span> AopProxy <span class="title function_">createAopProxy</span><span class="params">(AdvisedSupport config)</span> <span class="keyword">throws</span> AopConfigException &#123;</span><br><span class="line">  <span class="comment">// 1.判断使用JDK动态代理还是Cglib代理</span></span><br><span class="line">  <span class="comment">// optimize：用于控制通过cglib创建的代理是否使用激进的优化策略。除非完全了解AOP如何处理代理优化，否则不推荐使用这个配置，目前这个属性仅用于cglib代理，对jdk动态代理无效</span></span><br><span class="line">  <span class="comment">// proxyTargetClass：默认为false，设置为true时，强制使用cglib代理，设置方式：&lt;aop:aspectj-autoproxy proxy-target-class=&quot;true&quot; /&gt;</span></span><br><span class="line">  <span class="comment">// hasNoUserSuppliedProxyInterfaces：config是否存在代理接口或者只有SpringProxy一个接口</span></span><br><span class="line">  <span class="keyword">if</span> (config.isOptimize() || config.isProxyTargetClass() || hasNoUserSuppliedProxyInterfaces(config)) &#123;</span><br><span class="line">    <span class="comment">// 拿到要被代理的对象的类型</span></span><br><span class="line">    Class&lt;?&gt; targetClass = config.getTargetClass();</span><br><span class="line">    <span class="keyword">if</span> (targetClass == <span class="literal">null</span>) &#123;</span><br><span class="line">      <span class="comment">// TargetSource无法确定目标类：代理创建需要接口或目标。</span></span><br><span class="line">      <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">AopConfigException</span>(<span class="string">&quot;TargetSource cannot determine target class: &quot;</span> +</span><br><span class="line">                                   <span class="string">&quot;Either an interface or a target is required for proxy creation.&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 要被代理的对象是接口 || targetClass是Proxy class</span></span><br><span class="line">    <span class="comment">// 当且仅当使用getProxyClass方法或newProxyInstance方法动态生成指定的类作为代理类时，才返回true。</span></span><br><span class="line">    <span class="keyword">if</span> (targetClass.isInterface() || Proxy.isProxyClass(targetClass)) &#123;</span><br><span class="line">      <span class="comment">// JDK动态代理，这边的入参config(AdvisedSupport)实际上是ProxyFactory对象</span></span><br><span class="line">      <span class="comment">// 具体为：AbstractAutoProxyCreator中的proxyFactory.getProxy发起的调用，在ProxyCreatorSupport使用了this作为参数，</span></span><br><span class="line">      <span class="comment">// 调用了的本方法，这边的this就是发起调用的proxyFactory对象，而proxyFactory对象中包含了要执行的的拦截器</span></span><br><span class="line">      <span class="keyword">return</span> <span class="keyword">new</span> <span class="title class_">JdkDynamicAopProxy</span>(config);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// Cglib代理</span></span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> <span class="title class_">ObjenesisCglibAopProxy</span>(config);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">else</span> &#123;</span><br><span class="line">    <span class="comment">// JDK动态代理</span></span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> <span class="title class_">JdkDynamicAopProxy</span>(config);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>再回看getProxy 方法就简单了，因为我们没有配置，所以这里就是jdk 代理的使用了。</p>
+<p>就是通过classLoader、接口、InvocationHandler实现类，来获取到代理对象。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="keyword">public</span> Object <span class="title function_">getProxy</span><span class="params">(<span class="meta">@Nullable</span> ClassLoader classLoader)</span> &#123;</span><br><span class="line">  <span class="keyword">if</span> (logger.isTraceEnabled()) &#123;</span><br><span class="line">    logger.trace(<span class="string">&quot;Creating JDK dynamic proxy: &quot;</span> + <span class="built_in">this</span>.advised.getTargetSource());</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">// 1.拿到要被代理对象的所有接口</span></span><br><span class="line">  Class&lt;?&gt;[] proxiedInterfaces = AopProxyUtils.completeProxiedInterfaces(<span class="built_in">this</span>.advised, <span class="literal">true</span>);</span><br><span class="line">  findDefinedEqualsAndHashCodeMethods(proxiedInterfaces);</span><br><span class="line">  <span class="comment">// 2.通过classLoader、接口、InvocationHandler实现类，来获取到代理对象</span></span><br><span class="line">  <span class="keyword">return</span> Proxy.newProxyInstance(classLoader, proxiedInterfaces, <span class="built_in">this</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="小结-1"><a href="#小结-1" class="headerlink" title="小结"></a>小结</h4><p>这样生成代理的内容就结束了，其主要就是看到底是用cglib 还是jdk 来做代理，还有就是advisors 的解析。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>本次就是了解aop 的一些概念，当然网上找的肯定比我全，因为我也是找的，这个不是重点，主要还是aop 的代理创建和执行时机的描述，后面我们再分析请求的完整流程。</p>
+<h2 id="附录Spring-源码分析系列文章"><a href="#附录Spring-源码分析系列文章" class="headerlink" title="附录Spring 源码分析系列文章"></a>附录Spring 源码分析系列文章</h2><h3 id="IOC"><a href="#IOC" class="headerlink" title="IOC"></a>IOC</h3><table>
+<thead>
+<tr>
+<th align="left">时间</th>
+<th>文章</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">2022-03-09</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/09/Spring%20IOC-1/#more">Spring的基本概念和IOC流程的简述</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-11</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/11/Spring%20IOC-2/#more">IOC流程解析-BeanFactory的创建</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-14</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/14/Spring%20IOC-3/#more">IOC流程解析-BeanFactoyPostProcessor和BeanPostProcessor</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-15</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/15/Spring%20IOC-4/#more">IOC流程解析-实例化和初始化</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-17</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/17/Spring%20IOC-5/#more">IOC流程解析-循环依赖</a></td>
+</tr>
+</tbody></table>
+<h3 id="AOP"><a href="#AOP" class="headerlink" title="AOP"></a>AOP</h3><table>
+<thead>
+<tr>
+<th align="left">时间</th>
+<th>文章</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">2022-03-19</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/20/Spring%20AOP-1/#more">AOP流程源码分析-配置信息解析和代理对象创建</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-20</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/20/Spring%20AOP-2/#more">AOP流程源码分析-请求调用全流程</a></td>
+</tr>
+</tbody></table>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E6%A1%86%E6%9E%B6/" rel="tag"># 框架</a>
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/Spring/" rel="tag"># Spring</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2022/03/17/Spring%20IOC-5/" rel="prev" title="IOC流程解析-循环依赖">
+                  <i class="fa fa-chevron-left"></i> IOC流程解析-循环依赖
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2022/03/20/Spring%20AOP-2/" rel="next" title="AOP流程源码分析-请求调用全流程">
+                  AOP流程源码分析-请求调用全流程 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">李万青</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/next-boot.js"></script>
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+</body>
+</html>

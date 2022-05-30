@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 6.2.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css" integrity="sha256-DfWjNxDkM94fVBWx1H5BMMp0Zq7luBlV8QRcSES7s+0=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"example.com","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.11.1","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12},"copycode":{"enable":false,"style":null},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="本次内容为解析核心方法剩下的全部内容，重点是bean 的实例化和初始化部分。对于其余IOC 部分内容感兴趣的小伙伴可以根据文章最后的导航栏直接跳跃。 源码分析接着上篇文章（上篇文章是：[IOC流程解析-BeanFactoyPostProcessor和BeanPostProcessor](https:&#x2F;&#x2F;liwqtm.github.io&#x2F;2022&#x2F;03&#x2F;14&#x2F;Spring IOC-3&#x2F;#m">
+<meta property="og:type" content="article">
+<meta property="og:title" content="IOC流程解析-实例化和初始化">
+<meta property="og:url" content="http://example.com/2022/03/15/Spring%20IOC-4/index.html">
+<meta property="og:site_name" content="茯楚博客">
+<meta property="og:description" content="本次内容为解析核心方法剩下的全部内容，重点是bean 的实例化和初始化部分。对于其余IOC 部分内容感兴趣的小伙伴可以根据文章最后的导航栏直接跳跃。 源码分析接着上篇文章（上篇文章是：[IOC流程解析-BeanFactoyPostProcessor和BeanPostProcessor](https:&#x2F;&#x2F;liwqtm.github.io&#x2F;2022&#x2F;03&#x2F;14&#x2F;Spring IOC-3&#x2F;#m">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/04/23/20:49:51-image-20220423204948988.png">
+<meta property="article:published_time" content="2022-03-14T16:00:00.000Z">
+<meta property="article:modified_time" content="2022-04-28T10:11:57.242Z">
+<meta property="article:author" content="李万青">
+<meta property="article:tag" content="框架">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="Spring">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/04/23/20:49:51-image-20220423204948988.png">
+
+
+<link rel="canonical" href="http://example.com/2022/03/15/Spring%20IOC-4/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://example.com/2022/03/15/Spring%20IOC-4/","path":"2022/03/15/Spring IOC-4/","title":"IOC流程解析-实例化和初始化"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>IOC流程解析-实例化和初始化 | 茯楚博客</title>
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">茯楚博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">记录整理技术文章</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90"><span class="nav-number">1.</span> <span class="nav-text">源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%9D%E5%A7%8B%E5%8C%96%E6%B6%88%E6%81%AF%E6%BA%90%EF%BC%8C%E5%9B%BD%E9%99%85%E5%8C%96-initMessageSource%E6%96%B9%E6%B3%95"><span class="nav-number">1.1.</span> <span class="nav-text">初始化消息源，国际化-initMessageSource方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%9D%E5%A7%8B%E5%8C%96%E4%BA%8B%E4%BB%B6%E5%B9%BF%E6%92%AD%E5%99%A8-initApplicationEventMulticaster%E6%96%B9%E6%B3%95"><span class="nav-number">1.2.</span> <span class="nav-text">初始化事件广播器-initApplicationEventMulticaster方法</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Spring%E4%BA%8B%E4%BB%B6%E4%BC%A0%E6%92%AD%E6%9C%BA%E5%88%B6"><span class="nav-number">1.2.1.</span> <span class="nav-text">Spring事件传播机制</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8B%93%E5%B1%95%E6%96%B9%E6%B3%95-onRefresh%E6%96%B9%E6%B3%95"><span class="nav-number">1.3.</span> <span class="nav-text">拓展方法-onRefresh方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B3%A8%E5%86%8C%E7%9B%91%E5%90%AC%E5%99%A8-registerListeners%E6%96%B9%E6%B3%95"><span class="nav-number">1.4.</span> <span class="nav-text">注册监听器-registerListeners方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%9E%E4%BE%8B%E5%8C%96%E5%92%8C%E5%88%9D%E5%A7%8B%E5%8C%96%E6%96%B9%E6%B3%95-finishBeanFactoryInitialization%E6%96%B9%E6%B3%95"><span class="nav-number">1.5.</span> <span class="nav-text">实例化和初始化方法-finishBeanFactoryInitialization方法</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%8E%B7%E5%8F%96%E5%88%B0BeanDefinition%E5%B9%B6%E8%B0%83%E7%94%A8getBean%E6%96%B9%E6%B3%95-preInstantiateSingletons%E6%96%B9%E6%B3%95"><span class="nav-number">1.5.1.</span> <span class="nav-text">获取到BeanDefinition并调用getBean方法-preInstantiateSingletons方法</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#getBean-gt-doGetBean-gt-createBean-gt-doCreateBean"><span class="nav-number">1.5.2.</span> <span class="nav-text">getBean-&gt;doGetBean-&gt;createBean-&gt;doCreateBean</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E7%9C%9F%E6%AD%A3%E8%8E%B7%E5%8F%96%E5%AE%8C%E6%95%B4%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%86%85%E5%AE%B9-doCreateBean%E6%96%B9%E6%B3%95"><span class="nav-number">1.5.3.</span> <span class="nav-text">真正获取完整对象的内容-doCreateBean方法</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%AE%9E%E4%BE%8B%E5%8C%96"><span class="nav-number">1.5.3.1.</span> <span class="nav-text">实例化</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%88%9D%E5%A7%8B%E5%8C%96"><span class="nav-number">1.5.3.2.</span> <span class="nav-text">初始化</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%B1%9E%E6%80%A7%E6%B3%A8%E5%85%A5"><span class="nav-number">1.5.3.3.</span> <span class="nav-text">属性注入</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E6%BF%80%E6%B4%BB%E6%89%80%E6%9C%89Aware%E6%96%B9%E6%B3%95"><span class="nav-number">1.5.3.4.</span> <span class="nav-text">激活所有Aware方法</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%8A%A0%E8%BD%BD%E7%9A%84%E6%89%80%E6%9C%89Bean%E7%9A%84%E5%90%8E%E7%BD%AE%E5%A4%84%E7%90%86%E5%99%A8%E7%9A%84Before%E6%96%B9%E6%B3%95"><span class="nav-number">1.5.3.5.</span> <span class="nav-text">加载的所有Bean的后置处理器的Before方法</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E6%89%A7%E8%A1%8CInitializingBean%E6%8E%A5%E5%8F%A3%E5%88%9D%E5%A7%8B%E5%8C%96%E6%96%B9%E6%B3%95%E5%92%8C%E8%87%AA%E5%AE%9A%E4%B9%89%E5%88%9D%E5%A7%8B%E5%8C%96%E6%96%B9%E6%B3%95"><span class="nav-number">1.5.3.6.</span> <span class="nav-text">执行InitializingBean接口初始化方法和自定义初始化方法</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%E8%B0%83%E7%94%A8%E6%89%80%E6%9C%89BeanPostProcessor%E5%90%8E%E7%BD%AE%E5%A4%84%E7%90%86%E5%99%A8%E7%9A%84After%E6%96%B9%E6%B3%95"><span class="nav-number">1.5.3.7.</span> <span class="nav-text">调用所有BeanPostProcessor后置处理器的After方法</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%AE%8C%E6%95%B4%E5%AF%B9%E8%B1%A1%E6%B3%A8%E5%85%A5%E5%8D%95%E4%BE%8B%E6%B1%A0"><span class="nav-number">1.5.4.</span> <span class="nav-text">完整对象注入单例池</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%E5%87%BD%E6%95%B0%E6%8E%A5%E5%8F%A3-ObjectFactory%E6%8E%A5%E5%8F%A3"><span class="nav-number">1.5.4.1.</span> <span class="nav-text">函数接口-ObjectFactory接口</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8F%91%E5%B8%83%E4%BA%8B%E4%BB%B6%E4%B8%8E%E6%B8%85%E9%99%A4%E4%B8%8A%E4%B8%8B%E6%96%87%E7%8E%AF%E5%A2%83-finishRefresh%E6%96%B9%E6%B3%95"><span class="nav-number">1.6.</span> <span class="nav-text">发布事件与清除上下文环境-finishRefresh方法</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9D%A2%E8%AF%95%E7%82%B9%EF%BC%9ABeanFactory%E5%92%8CFactoryBean%E7%9A%84%E5%8C%BA%E5%88%AB%E4%B8%8EFactoryBean%E5%92%8C%E6%99%AE%E9%80%9ABean%E7%9A%84%E5%8C%BA%E5%88%AB"><span class="nav-number">2.</span> <span class="nav-text">面试点：BeanFactory和FactoryBean的区别与FactoryBean和普通Bean的区别</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#BeanFactory%E5%92%8CFactoryBean%E5%8C%BA%E5%88%AB"><span class="nav-number">2.1.</span> <span class="nav-text">BeanFactory和FactoryBean区别</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#FactoryBean%E5%92%8C%E6%99%AE%E9%80%9ABean%E7%9A%84%E5%8C%BA%E5%88%AB"><span class="nav-number">2.2.</span> <span class="nav-text">FactoryBean和普通Bean的区别</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">3.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%99%84%E5%BD%95Spring-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E7%B3%BB%E5%88%97%E6%96%87%E7%AB%A0"><span class="nav-number">4.</span> <span class="nav-text">附录Spring 源码分析系列文章</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#IOC"><span class="nav-number">4.1.</span> <span class="nav-text">IOC</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#AOP"><span class="nav-number">4.2.</span> <span class="nav-text">AOP</span></a></li></ol></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="李万青"
+      src="/images/8a06cd0a8da6a6848b7a0b37b32164b7.jpeg">
+  <p class="site-author-name" itemprop="name">李万青</p>
+  <div class="site-description" itemprop="description">苦心人天不负</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">14</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/liwqtm/liwqtm.github.io" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;liwqtm&#x2F;liwqtm.github.io" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll site-overview-item animated">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/m0_51464746?type=blog" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;m0_51464746?type&#x3D;blog" rel="noopener" target="_blank">张怀猛的博客</a>
+        </li>
+    </ul>
+  </div>
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2022/03/15/Spring%20IOC-4/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/8a06cd0a8da6a6848b7a0b37b32164b7.jpeg">
+      <meta itemprop="name" content="李万青">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="茯楚博客">
+      <meta itemprop="description" content="苦心人天不负">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="IOC流程解析-实例化和初始化 | 茯楚博客">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          IOC流程解析-实例化和初始化
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2022-03-15 00:00:00" itemprop="dateCreated datePublished" datetime="2022-03-15T00:00:00+08:00">2022-03-15</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-04-28 18:11:57" itemprop="dateModified" datetime="2022-04-28T18:11:57+08:00">2022-04-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Java%E6%A1%86%E6%9E%B6/" itemprop="url" rel="index"><span itemprop="name">Java框架</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Java%E6%A1%86%E6%9E%B6/Spring/" itemprop="url" rel="index"><span itemprop="name">Spring</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>本次内容为解析核心方法剩下的全部内容，重点是bean 的实例化和初始化部分。对于其余IOC 部分内容感兴趣的小伙伴可以根据文章最后的导航栏直接跳跃。</p>
+<h2 id="源码分析"><a href="#源码分析" class="headerlink" title="源码分析"></a>源码分析</h2><p>接着上篇文章（上篇文章是：[IOC流程解析-BeanFactoyPostProcessor和BeanPostProcessor](<a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/14/Spring">https://liwqtm.github.io/2022/03/14/Spring</a> IOC-3&#x2F;#more)），我们还是继续看IOC 的核心方法refresh 方法的内容。这次会提到两个面试常问的问题：BeanFactory 和FactoryBean 的区别、FactoryBean 和普通Bean 的区别，这个文章的最后我会细说一下，有需要面试的小伙伴可以直接跳到文章最后查看。<span id="more"></span></p>
+<h3 id="初始化消息源，国际化-initMessageSource方法"><a href="#初始化消息源，国际化-initMessageSource方法" class="headerlink" title="初始化消息源，国际化-initMessageSource方法"></a>初始化消息源，国际化-initMessageSource方法</h3><p>从上篇文章讲的registerBeanPostProcessors 方法后，这里就来到initMessageSource 方法。</p>
+<p>initMessageSource 方法不是我们的重点，我们这里就简单描述一下其主要作用：初始化消息源，也就是国际化，目的就是为了多语言的切换，而initMessageSource 方法的执行结果就是向BeanFactory 中的单例池singletonObjects 集合添加了一个bean，一个完整的bean 对象messageSource 对象。</p>
+<h3 id="初始化事件广播器-initApplicationEventMulticaster方法"><a href="#初始化事件广播器-initApplicationEventMulticaster方法" class="headerlink" title="初始化事件广播器-initApplicationEventMulticaster方法"></a>初始化事件广播器-initApplicationEventMulticaster方法</h3><p>核心方法接着往下走，看到initApplicationEventMulticaster 方法，这个方法也同样简单，还是向BeanFactory 中的单例池singletonObjects 集合添加了一个完整的bean 对象，如果在没有配置事件广播器的情况下，默认创建的是SimpleApplicationEventMulticaster 对象。</p>
+<h4 id="Spring事件传播机制"><a href="#Spring事件传播机制" class="headerlink" title="Spring事件传播机制"></a>Spring事件传播机制</h4><p>这个还需要知道一个知识点：Spring事件传播机制。首先我们要知道Spring事件传播机制是参考监听者模式改造而来，正常的监听者模式为：被监听者和监听者，当被监听者发生改变时，会将改变推送给监听者。spring 在这个基础上加了一个事件广播器，由这个事件广播器来维护监听者和被监听者之间的关系，也是就将监听者放进集合列表中，然后和被监听者关系对应起来。</p>
+<p>那么这里就有三个角色：</p>
+<ul>
+<li><p>事件监听器（ApplicationListener）</p>
+</li>
+<li><p>事件发布者（ApplicationEventPublisher）因为ApplicationContext 实现了 ApplicationEventPublisher，所以事件发布可以直接使用ApplicationContext</p>
+</li>
+<li><p>事件广播器（ApplicationEventMulticaster），这里系统默认创建的是SimpleApplicationEventMulticaster</p>
+</li>
+</ul>
+<p>除此之外还有一个就是事件本身（ApplicationEvent），当<strong>事件发布者</strong>对<strong>事件广播器</strong>发布事件的时候，其实就是传输了一个ApplicationEvent 事件对象，然后由<strong>事件广播器</strong>再次传输给监听列表中的每一个<strong>事件监听器</strong>这个ApplicationEvent事件对象。</p>
+<p>事件传播机制先说到这里。继续说核心代码。</p>
+<h3 id="拓展方法-onRefresh方法"><a href="#拓展方法-onRefresh方法" class="headerlink" title="拓展方法-onRefresh方法"></a>拓展方法-onRefresh方法</h3><p>onRefresh方法这个没有说的，这个就是一个空方法，可以用来自己实现一些业务逻辑的。</p>
+<h3 id="注册监听器-registerListeners方法"><a href="#注册监听器-registerListeners方法" class="headerlink" title="注册监听器-registerListeners方法"></a>注册监听器-registerListeners方法</h3><p>这里就是上面说的事件传播机制的监听器注册，还是向BeanFactory 中的单例池singletonObjects 集合添加了一个完整的bean 对象，同时也会获取到所有实现了ApplicationListener 接口的对象，然后添加的广播器维护的监听列表集合中，等待后续的调用。</p>
+<h3 id="实例化和初始化方法-finishBeanFactoryInitialization方法"><a href="#实例化和初始化方法-finishBeanFactoryInitialization方法" class="headerlink" title="实例化和初始化方法-finishBeanFactoryInitialization方法"></a>实例化和初始化方法-finishBeanFactoryInitialization方法</h3><p>终于到本次的重点了，走完了前面一系列的操作，然后到了IOC 流程图中的重点实例化和初始化bean，先回顾一下这部分的流程图。这也是IOC 流程的最后一步了。</p>
+<img src="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/04/23/20:49:51-image-20220423204948988.png" alt="image-20220423204948988" style="zoom: 50%;" />
+
+<p>我们跟进finishBeanFactoryInitialization 方法，其余的代码可以不看，这里都是设置一些加载器之类的，重点看这个方法的最后一句。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 5.实例化所有剩余（非懒加载）单例对象  重要===》</span></span><br><span class="line">beanFactory.preInstantiateSingletons();	</span><br></pre></td></tr></table></figure>
+
+<h4 id="获取到BeanDefinition并调用getBean方法-preInstantiateSingletons方法"><a href="#获取到BeanDefinition并调用getBean方法-preInstantiateSingletons方法" class="headerlink" title="获取到BeanDefinition并调用getBean方法-preInstantiateSingletons方法"></a>获取到BeanDefinition并调用getBean方法-preInstantiateSingletons方法</h4><p>跟进preInstantiateSingletons 方法，首先获取的就是所有BeanDefinition 名称的集合，注意我们目前执行的代码就是在之前创建的BeanFactroy，所以这个名称集合是可以直接获取的。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 1.创建beanDefinitionNames的副本beanNames用于后续的遍历，以允许init等方法注册新的bean定义。</span></span><br><span class="line">List&lt;String&gt; beanNames = <span class="keyword">new</span> <span class="title class_">ArrayList</span>&lt;&gt;(<span class="built_in">this</span>.beanDefinitionNames);</span><br></pre></td></tr></table></figure>
+
+<p>然后遍历这个集合，用名字获取到具体的对象。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 2.遍历beanNames，触发所有非懒加载单例bean的初始化</span></span><br><span class="line"><span class="keyword">for</span> (String beanName : beanNames) &#123;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 3.获取beanName对应的MergedBeanDefinition</span></span><br><span class="line">  <span class="comment">/*</span></span><br><span class="line"><span class="comment">			  Merged意义在于处理bean之间的父子继承关系，处理属性继承和覆盖（如果有的话）。</span></span><br><span class="line"><span class="comment">			 */</span></span><br><span class="line">  <span class="type">RootBeanDefinition</span> <span class="variable">bd</span> <span class="operator">=</span> getMergedLocalBeanDefinition(beanName);</span><br></pre></td></tr></table></figure>
+
+<p>接下就要判断是否要将对象交给spring 管理，也就是要不要将对象添加的BeanFcatory 的单例池属性中，其依据有三个：BeanDefinition 对应的Bean实例是否是抽象类、是否是单例、是否懒加载，只要其中一个条件不满足，那么当前就不会注册spring 单例池，也就说必须是非抽象类、非懒加载的单例对象spring 在启动的时候才会去注册。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 4.bd对应的Bean实例：不是抽象类 &amp;&amp; 是单例 &amp;&amp; 不是懒加载</span></span><br><span class="line"><span class="keyword">if</span> (!bd.isAbstract() &amp;&amp; bd.isSingleton() &amp;&amp; !bd.isLazyInit()) &#123;</span><br></pre></td></tr></table></figure>
+
+<p>接下来就是将这些非抽象类、非懒加载的单例对象再次分类、判断该对象是否实现了FactoryBean 接口，FactoryBean这里会单独处理一下对象名称，然后再注册其对象，注意这里不是注册FactoryBean 的getObjeck 方法返回的对象。</p>
+<p>FactoryBean 接口注册和普通注册的方法都是同一个，主要就是beanName 做了处理，所以我们重点看getBean 方法就行。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 5.判断beanName对应的bean是否为FactoryBean</span></span><br><span class="line"><span class="keyword">if</span> (isFactoryBean(beanName)) &#123;&#125;</span><br><span class="line"><span class="keyword">else</span> &#123;</span><br><span class="line">  <span class="comment">// 6.如果beanName对应的bean不是FactoryBean，只是普通Bean，通过beanName获取bean实例</span></span><br><span class="line">  <span class="comment">// 调用前置后置处理器、实例化、填充、反射，都藏在这个getBean里！</span></span><br><span class="line">  <span class="comment">//getBean---doGetBean---createBean---doCreateBean</span></span><br><span class="line">  getBean(beanName);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="getBean-gt-doGetBean-gt-createBean-gt-doCreateBean"><a href="#getBean-gt-doGetBean-gt-createBean-gt-doCreateBean" class="headerlink" title="getBean-&gt;doGetBean-&gt;createBean-&gt;doCreateBean"></a>getBean-&gt;doGetBean-&gt;createBean-&gt;doCreateBean</h4><p>spring 关于getBean 方法往后的调用都比较复杂，但是只跟着主流程，也就是getBean-&gt;doGetBean-&gt;createBean-&gt;doCreateBean 这一段方法逻辑走，一定不会跟丢，我们这里就简单的介绍一下前三个方法，正在的构建bean 和注册单例池还是在doCreateBean 方法里面。</p>
+<p>首先是getBean 方法的调用，这里还是挺简单的，就是直接调用doGetBean 方法。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="keyword">public</span> Object <span class="title function_">getBean</span><span class="params">(String name)</span> <span class="keyword">throws</span> BeansException &#123;</span><br><span class="line">  <span class="comment">// 获取name对应的bean实例，如果不存在，则创建一个</span></span><br><span class="line">  <span class="keyword">return</span> doGetBean(name, <span class="literal">null</span>, <span class="literal">null</span>, <span class="literal">false</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>然后是doGetBean 方法，这里代码就比较多了，我们要知道的是在这个方法里面大体做了些什么事情就行了。其主要目的就是调用createBean 方法。</p>
+<ol>
+<li>判断当前对象是否已经注册到spring 的单例池中了，是则直接返回，这也是为什么单例池也叫做一级缓存的原因。</li>
+<li>解决循环依赖，这里我们后面说循环依赖的时候再回头来看。</li>
+<li>然后判断如果存在副容器的话，还要再去副容器中判断获取是否存在当前对象实例。</li>
+<li>最后获取到具体的BeanDefinition 对象，然后判断该对象是否是单例，因为这里单例是一段逻辑，多例又是另一端段逻辑，不过最后都是调用createBean 方法。</li>
+</ol>
+<p>接着是createBean 方法，这里的内容比较简单，最主要的就是调用doCreateBean 方法，不是我敷衍啊，真是我能力有限，我们还是看最主要的方法就行了。</p>
+<h4 id="真正获取完整对象的内容-doCreateBean方法"><a href="#真正获取完整对象的内容-doCreateBean方法" class="headerlink" title="真正获取完整对象的内容-doCreateBean方法"></a>真正获取完整对象的内容-doCreateBean方法</h4><p>终于来到了本次的重中之重，这里也是IOC 的核心，理清楚这个流程基本上IOC 的面试就不是问题了。老规矩还是看重点，一点一点的分析。</p>
+<h5 id="实例化"><a href="#实例化" class="headerlink" title="实例化"></a>实例化</h5><p>首先就是就是bean 的实例化，这里调用的是createBeanInstance 方法。这里个方法里面的代码没有什么可以深究的，就是通过反射获取到对应的实例对象，注意第一重点：这里实例出的对象是没有任何属性值的，就只是反射实例了一个对象而已。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (instanceWrapper == <span class="literal">null</span>) &#123;</span><br><span class="line">  <span class="comment">// 3.【bean实例化】根据beanName、mbd、args，使用对应的策略创建Bean实例，并返回包装类BeanWrapper【关键点】!!</span></span><br><span class="line">  instanceWrapper = createBeanInstance(beanName, mbd, args);  <span class="comment">// ===&gt; 反射来创建实例</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 4.拿到创建好的Bean实例，这里已经实例化完成！ 相当于new出来了</span></span><br><span class="line"><span class="type">Object</span> <span class="variable">bean</span> <span class="operator">=</span> instanceWrapper.getWrappedInstance();</span><br></pre></td></tr></table></figure>
+
+<h5 id="初始化"><a href="#初始化" class="headerlink" title="初始化"></a>初始化</h5><p>然后看第二个重点：bean 的初始化。这里是两段代码调用，首先就是属性的注入，然后是bean 的初始化，主要属性注入是属于初始化的流程中，不是实例化的，这里区分开是为了后面对于循环依赖的理解和解决。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 9.【属性注入】对bean进行属性填充；其中，可能存在依赖于其他bean的属性，则会递归初始化依赖的bean实例</span></span><br><span class="line">populateBean(beanName, mbd, instanceWrapper);  <span class="comment">// ===&gt; instanceWrapper藏着我们的bean，给他灌属性</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 10.【bean初始化】（回调Bean的后置处理器等..）！</span></span><br><span class="line">exposedObject = initializeBean(beanName, exposedObject, mbd);  <span class="comment">// ====》</span></span><br></pre></td></tr></table></figure>
+
+<h5 id="属性注入"><a href="#属性注入" class="headerlink" title="属性注入"></a>属性注入</h5><p>首先跟进populateBean 方法。</p>
+<p>这里我们直接看重点，方法中的最后一句话。上面全部都是一些校验之类的，我们暂时不关注。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 真正的注入在这里！！将属性注入到bean实例当中，这才是真正的属性赋值的地方【关键点】</span></span><br><span class="line">applyPropertyValues(beanName, mbd, bw, pvs);</span><br></pre></td></tr></table></figure>
+
+<p>继续跟进applyPropertyValues 方法。</p>
+<p>这里我们找到resolveValueIfNecessary 方法的调用，上面的内容都是获取当前对象需要赋值的属性和为了构建valueResolver 解析器对象，判断了一些是否是注解方式注入、set注入之类的，然后构建出具体的解析器对象，我们重点看resolveValueIfNecessary 方法。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/*</span></span><br><span class="line"><span class="comment"> *  【重点】使用解析器解析不同类型的值（包括循环依赖的解决）</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="type">Object</span> <span class="variable">resolvedValue</span> <span class="operator">=</span> valueResolver.resolveValueIfNecessary(pv, originalValue);</span><br></pre></td></tr></table></figure>
+
+<p>继续跟进resolveValueIfNecessary 方法。</p>
+<p>到了这里就是判断当前需要注入的属性，属于哪个类型，然后再调用具体的赋值方法，这里就不重点看了，后面将循环依赖的时候，我们再回头来看其中对于对象注入的具体方法。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 7. 解析List</span></span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (value <span class="keyword">instanceof</span> ManagedList) &#123;</span><br><span class="line">  <span class="comment">// May need to resolve contained runtime references.</span></span><br><span class="line">  <span class="keyword">return</span> resolveManagedList(argName, (List&lt;?&gt;) value);</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// 8. 解析Set</span></span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (value <span class="keyword">instanceof</span> ManagedSet) &#123;</span><br><span class="line">  <span class="comment">// May need to resolve contained runtime references.</span></span><br><span class="line">  <span class="keyword">return</span> resolveManagedSet(argName, (Set&lt;?&gt;) value);</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// 9. 解析Map</span></span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (value <span class="keyword">instanceof</span> ManagedMap) &#123;</span><br><span class="line">  <span class="comment">// May need to resolve contained runtime references.</span></span><br><span class="line">  <span class="keyword">return</span> resolveManagedMap(argName, (Map&lt;?, ?&gt;) value);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<h5 id="激活所有Aware方法"><a href="#激活所有Aware方法" class="headerlink" title="激活所有Aware方法"></a>激活所有Aware方法</h5><p>然后跟进initializeBean 方法。</p>
+<p>这里可以看到首先就是激活所有Aware 方法，这里就是判断当前对象是否实现了BeanNameAware、BeanClassLoaderAware、BeanFactoryAware 接口，然后将对应的对应的setBeanName、setBeanClassLoader、setBeanFactory 方法里面塞值。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">protected</span> Object <span class="title function_">initializeBean</span><span class="params">(String beanName, Object bean, <span class="meta">@Nullable</span> RootBeanDefinition mbd)</span> &#123;</span><br><span class="line">  <span class="comment">// 1.激活Aware方法</span></span><br><span class="line">  <span class="keyword">if</span> (System.getSecurityManager() != <span class="literal">null</span>) &#123;</span><br><span class="line">    AccessController.doPrivileged((PrivilegedAction&lt;Object&gt;) () -&gt; &#123;</span><br><span class="line">      invokeAwareMethods(beanName, bean);</span><br><span class="line">      <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">    &#125;, getAccessControlContext());</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">else</span> &#123;</span><br><span class="line">    <span class="comment">// 如果 bean 实现了 BeanNameAware、BeanClassLoaderAware 或 BeanFactoryAware 接口，回调</span></span><br><span class="line">    invokeAwareMethods(beanName, bean);</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+
+<h5 id="加载的所有Bean的后置处理器的Before方法"><a href="#加载的所有Bean的后置处理器的Before方法" class="headerlink" title="加载的所有Bean的后置处理器的Before方法"></a>加载的所有Bean的后置处理器的Before方法</h5><p>接下来就是调用我们之前加载的所有Bean 的后置处理器的Before 方法，这里我是上篇文章说过的<a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/14/Spring%20IOC-3/#more">IOC流程解析-BeanFactoyPostProcessor和BeanPostProcessor</a>，这里的调用也很简单，就说在BeanFactory 中获取BeanPostProcessor 集合，然后迭代调用即可。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">Object</span> <span class="variable">wrappedBean</span> <span class="operator">=</span> bean;</span><br><span class="line"><span class="keyword">if</span> (mbd == <span class="literal">null</span> || !mbd.isSynthetic()) &#123;</span><br><span class="line">  <span class="comment">// 2.在初始化前应用BeanPostProcessor的postProcessBeforeInitialization方法，允许对bean实例进行包装</span></span><br><span class="line">  wrappedBean = applyBeanPostProcessorsBeforeInitialization(wrappedBean, beanName);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="keyword">public</span> Object <span class="title function_">applyBeanPostProcessorsBeforeInitialization</span><span class="params">(Object existingBean, String beanName)</span></span><br><span class="line">  <span class="keyword">throws</span> BeansException &#123;</span><br><span class="line"></span><br><span class="line">  <span class="type">Object</span> <span class="variable">result</span> <span class="operator">=</span> existingBean;</span><br><span class="line">  <span class="comment">// 1.遍历所有注册的BeanPostProcessor实现类，调用postProcessBeforeInitialization方法</span></span><br><span class="line">  <span class="keyword">for</span> (BeanPostProcessor processor : getBeanPostProcessors()) &#123;</span><br><span class="line">    <span class="comment">// 2.在bean初始化方法执行前，调用postProcessBeforeInitialization方法</span></span><br><span class="line">    <span class="type">Object</span> <span class="variable">current</span> <span class="operator">=</span> processor.postProcessBeforeInitialization(result, beanName);</span><br><span class="line">    <span class="keyword">if</span> (current == <span class="literal">null</span>) &#123;</span><br><span class="line">      <span class="keyword">return</span> result;</span><br><span class="line">    &#125;</span><br><span class="line">    result = current;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> result;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h5 id="执行InitializingBean接口初始化方法和自定义初始化方法"><a href="#执行InitializingBean接口初始化方法和自定义初始化方法" class="headerlink" title="执行InitializingBean接口初始化方法和自定义初始化方法"></a>执行InitializingBean接口初始化方法和自定义初始化方法</h5><p>继续就到了invokeInitMethods 初始化方法，这一步就是判断bean 配置信息标签中是否设置了init-method 属性，如果是则执行设置的自定义初始化方法，或者判断bean 是都实现了InitializingBean 接口，如果是则调用其afterPropertiesSet 方法。注意是走的InitializingBean 接口，然后再走的自定义方法。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="keyword">try</span> &#123;</span><br><span class="line">  <span class="comment">// 3.调用初始化方法（ 处理 bean 中定义的 init-method，或者如果 bean 实现了 InitializingBean 接口，调用 afterPropertiesSet() 方法）</span></span><br><span class="line">  invokeInitMethods(beanName, wrappedBean, mbd);</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">catch</span> (Throwable ex) &#123;</span><br><span class="line">  <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">BeanCreationException</span>(</span><br><span class="line">    (mbd != <span class="literal">null</span> ? mbd.getResourceDescription() : <span class="literal">null</span>),</span><br><span class="line">    beanName, <span class="string">&quot;Invocation of init method failed&quot;</span>, ex);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h5 id="调用所有BeanPostProcessor后置处理器的After方法"><a href="#调用所有BeanPostProcessor后置处理器的After方法" class="headerlink" title="调用所有BeanPostProcessor后置处理器的After方法"></a>调用所有BeanPostProcessor后置处理器的After方法</h5><p>然后就是最后调用所有BeanPostProcessor 后置处理器的After 方法，这里依然是迭代调用，跟上面的Before 方法没有区别。最后返回初始化完成结果。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (mbd == <span class="literal">null</span> || !mbd.isSynthetic()) &#123;</span><br><span class="line">  <span class="comment">// 4.在初始化后应用BeanPostProcessor的postProcessAfterInitialization方法，允许对bean实例进行包装</span></span><br><span class="line">  wrappedBean = applyBeanPostProcessorsAfterInitialization(wrappedBean, beanName);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 5.返回wrappedBean</span></span><br><span class="line"><span class="keyword">return</span> wrappedBean;</span><br></pre></td></tr></table></figure>
+
+<p>这个后面的方法就可以不看了，自行了解一下就行。这个方法执行完成之后，我们就得到了一个完整的bean 对象，然后我们回到doGetBean 方法，这里有一个很有意思的地方，刚刚忘记说了，createBean 方法本身不是在doGetBean 方法中调用的，我们再看下具体代码。</p>
+<h4 id="完整对象注入单例池"><a href="#完整对象注入单例池" class="headerlink" title="完整对象注入单例池"></a>完整对象注入单例池</h4><p>注意这里的意思是：调用getSingleton 方法，并传入一个beanName和一个函数。也就是说doGetBean 方法调用的是getSingleton 方法，而不是doGetBean 方法，当然最后还是调用doGetBean 方法，我们上面的思路是没有错的，就是在中间加一步。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 9.1 scope为singleton的bean创建（新建了一个ObjectFactory，并且重写了getObject方法）</span></span><br><span class="line">sharedInstance = getSingleton(beanName, () -&gt; &#123;</span><br><span class="line">  <span class="keyword">try</span> &#123;</span><br><span class="line">    <span class="comment">// 9.1.1 创建Bean实例 ===》</span></span><br><span class="line">    <span class="keyword">return</span> createBean(beanName, mbd, args);  <span class="comment">// ===&gt; 重点看这里，真实的创建过程</span></span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">catch</span> (BeansException ex) &#123;</span><br><span class="line">    <span class="comment">// Explicitly remove instance from singleton cache: It might have been put there</span></span><br><span class="line">    <span class="comment">// eagerly by the creation process, to allow for circular reference resolution.</span></span><br><span class="line">    <span class="comment">// Also remove any beans that received a temporary reference to the bean.</span></span><br><span class="line">    destroySingleton(beanName);</span><br><span class="line">    <span class="keyword">throw</span> ex;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>我们这里跟进getSingleton 方法，首先加锁判避免重复创建，然后判断是否存在一级缓存中，也就是单例池中，然后做一些准备工作，最后调用我们刚刚传入函数的getObject 方法，这里回头再看其实入参就是ObjectFactory 类型对象，而我们刚刚看的函数就是getObject 方法的重写。</p>
+<p>这里还有一个需要注意的就是在调用doCreateBean 方法之前，这里会添加一个在singletonsCurrentlyInCreation 集合属性，这里记录的就是当前Bean 正在被创建。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 5.创建单例前的操作</span></span><br><span class="line">beforeSingletonCreation(beanName);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 6.执行singletonFactory的getObject方法获取bean实例</span></span><br><span class="line">singletonObject = singletonFactory.getObject();</span><br></pre></td></tr></table></figure>
+
+<h5 id="函数接口-ObjectFactory接口"><a href="#函数接口-ObjectFactory接口" class="headerlink" title="函数接口-ObjectFactory接口"></a>函数接口-ObjectFactory接口</h5><p>这里又有一个小知识点，我自己本身也没有怎么看，用推测的吧，首先上面提到的ObjectFactory 接口，本身只有一个方法就是getObject，但是有一个由java 提供的注解@FunctionalInterface，字面理解是功能接口，我理解是函数接口，可以接收一个函数式的方法，只跟上面的实现一样。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@FunctionalInterface</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">interface</span> <span class="title class_">ObjectFactory</span>&lt;T&gt; &#123;</span><br><span class="line"></span><br><span class="line">	T <span class="title function_">getObject</span><span class="params">()</span> <span class="keyword">throws</span> BeansException;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>那么上一步走完后，接下来就是addSingleton 方法的调用，这一步是为了将刚刚创建的对象存入单例池中。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 8.如果是新的单例对象，将beanName和对应的bean实例添加到缓存中（singletonObjects、registeredSingletons）</span></span><br><span class="line">addSingleton(beanName, singletonObject);</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title function_">addSingleton</span><span class="params">(String beanName, Object singletonObject)</span> &#123;</span><br><span class="line">  <span class="keyword">synchronized</span> (<span class="built_in">this</span>.singletonObjects) &#123;</span><br><span class="line">    <span class="comment">// 1.添加到单例对象缓存（1级缓存）</span></span><br><span class="line">    <span class="built_in">this</span>.singletonObjects.put(beanName, singletonObject);</span><br><span class="line">    <span class="comment">// 2.将单例工厂缓存移除（已经不需要）</span></span><br><span class="line">    <span class="built_in">this</span>.singletonFactories.remove(beanName);</span><br><span class="line">    <span class="comment">// 3.将早期单例对象缓存移除（已经不需要）（2级缓存）</span></span><br><span class="line">    <span class="built_in">this</span>.earlySingletonObjects.remove(beanName);</span><br><span class="line">    <span class="comment">// 4.添加到已经注册的单例对象缓存</span></span><br><span class="line">    <span class="built_in">this</span>.registeredSingletons.add(beanName);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>到这里为止IOC 实例化、初始化、注册单例池的内容基本就结束了。</p>
+<h3 id="发布事件与清除上下文环境-finishRefresh方法"><a href="#发布事件与清除上下文环境-finishRefresh方法" class="headerlink" title="发布事件与清除上下文环境-finishRefresh方法"></a>发布事件与清除上下文环境-finishRefresh方法</h3><p>回到refresh 核心方法，我们还有最后一步，就是发布事件并清除上下文环境，这里也很好理解，我们上面不是构建了事件广播器之类的对象嘛，这里就是用来发布事件到广播器，然后由广播器推送到监听列表中的各个监听器的，至于上下文环境之类的我们后面MVC 的内容再说。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title function_">finishRefresh</span><span class="params">()</span> &#123;</span><br><span class="line">  <span class="comment">// Clear context-level resource caches (such as ASM metadata from scanning).</span></span><br><span class="line">  <span class="comment">//清除resourceCaches资源缓存中的数据</span></span><br><span class="line">  clearResourceCaches();</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Initialize lifecycle processor for this context.</span></span><br><span class="line">  <span class="comment">//注释1. 为此上下文初始化生命周期处理器</span></span><br><span class="line">  initLifecycleProcessor();</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Propagate refresh to lifecycle processor first.</span></span><br><span class="line">  <span class="comment">//注释2. 首先将刷新完毕事件传播到生命周期处理器（触发isAutoStartup方法返回true的SmartLifecycle的start方法）</span></span><br><span class="line">  getLifecycleProcessor().onRefresh();</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Publish the final event.</span></span><br><span class="line">  <span class="comment">//注释3. 推送上下文刷新完毕事件到相应的监听器</span></span><br><span class="line">  publishEvent(<span class="keyword">new</span> <span class="title class_">ContextRefreshedEvent</span>(<span class="built_in">this</span>));</span><br><span class="line"></span><br><span class="line">  <span class="comment">// Participate in LiveBeansView MBean, if active.</span></span><br><span class="line">  LiveBeansView.registerApplicationContext(<span class="built_in">this</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="面试点：BeanFactory和FactoryBean的区别与FactoryBean和普通Bean的区别"><a href="#面试点：BeanFactory和FactoryBean的区别与FactoryBean和普通Bean的区别" class="headerlink" title="面试点：BeanFactory和FactoryBean的区别与FactoryBean和普通Bean的区别"></a>面试点：BeanFactory和FactoryBean的区别与FactoryBean和普通Bean的区别</h2><h3 id="BeanFactory和FactoryBean区别"><a href="#BeanFactory和FactoryBean区别" class="headerlink" title="BeanFactory和FactoryBean区别"></a>BeanFactory和FactoryBean区别</h3><p>我们先说BeanFactory 和FactoryBean 区别，这个比较简单，通过这一些的文章我们已经很了解BeanFactory 了，那我们现在只要知道FactoryBean 就行了。</p>
+<p>FactoryBean 就是一个单纯的接口，其中有三个方法需要实现，最主要的就是getObject，可以这么说如果有对象实现了FactoryBean 接口，那么bean 获取的时候，就不再获取本身对象实例，也就是说如果A 实现了FactoryBean 接口，那么applicationContext.getBean(A) 的时候，获取到的就是可能不是A，而是FactoryBean 的getObject 方法返回的对象。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">interface</span> <span class="title class_">FactoryBean</span>&lt;T&gt; &#123;</span><br><span class="line"></span><br><span class="line">	T <span class="title function_">getObject</span><span class="params">()</span> <span class="keyword">throws</span> Exception;</span><br><span class="line"></span><br><span class="line">	Class&lt;?&gt; getObjectType();</span><br><span class="line"></span><br><span class="line">	<span class="type">boolean</span> <span class="title function_">isSingleton</span><span class="params">()</span>;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>对了这里我们还可以简单看下FactoryBean 是怎么获取到对象的。还是以applicationContext.getBean(A) 来跟进调用。</p>
+<p>跟进后发现有回到了上面说的doGetBean 方法的调用。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> Object <span class="title function_">getBean</span><span class="params">(String name)</span> <span class="keyword">throws</span> BeansException &#123;</span><br><span class="line">  <span class="comment">// 获取name对应的bean实例，如果不存在，则创建一个</span></span><br><span class="line">  <span class="keyword">return</span> doGetBean(name, <span class="literal">null</span>, <span class="literal">null</span>, <span class="literal">false</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>其实上面注册过之后，我们就可以在单例池中拿到对应的对象实例，注意这里的实例还是A 对象的实例，然后就可以进入我们上面没有进入的判断，调用getObjectForBeanInstance 方法。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 2.尝试从缓存中获取beanName对应的实例， 循环依赖闭环可以拿到</span></span><br><span class="line">		<span class="type">Object</span> <span class="variable">sharedInstance</span> <span class="operator">=</span> getSingleton(beanName);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 这里说下 args ，虽然看上去一点不重要。前面我们一路进来的时候都是 getBean(beanName)，</span></span><br><span class="line"><span class="comment">// 所以 args 传参其实是 null 的，但是如果 args 不为空的时候，那么意味着调用方不是希望获取 Bean，而是创建 Bean</span></span><br><span class="line"><span class="keyword">if</span> (sharedInstance != <span class="literal">null</span> &amp;&amp; args == <span class="literal">null</span>) &#123;</span><br><span class="line">  <span class="comment">// 3.1 返回beanName对应的实例对象（主要用于FactoryBean的特殊处理，普通Bean会直接返回sharedInstance本身）</span></span><br><span class="line">  bean = getObjectForBeanInstance(sharedInstance, name, beanName, <span class="literal">null</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里的方法更简单。如果不是FactoryBean 实现，直接返回，也就说普通对象，不走下面的流程，如果是则将传入的实例对象强转为FactoryBean 对象，然后getObjectFromFactoryBean 方法获取真正的返回实例对象，这个方法就是调用其getObject 方法。不过正在的调用还在里面的一层doGetObjectFromFactoryBean 方法中。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (!(beanInstance <span class="keyword">instanceof</span> FactoryBean)) &#123;</span><br><span class="line">  <span class="keyword">return</span> beanInstance;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> (object == <span class="literal">null</span>) &#123;</span><br><span class="line">  <span class="comment">// Return bean instance from factory.</span></span><br><span class="line">  <span class="comment">// 3.只有beanInstance是FactoryBean才能走到这边，因此直接强转</span></span><br><span class="line">  FactoryBean&lt;?&gt; factory = (FactoryBean&lt;?&gt;) beanInstance;</span><br><span class="line">  <span class="comment">// Caches object obtained from FactoryBean if it is a singleton.</span></span><br><span class="line">  <span class="keyword">if</span> (mbd == <span class="literal">null</span> &amp;&amp; containsBeanDefinition(beanName)) &#123;</span><br><span class="line">    <span class="comment">// 4.mbd为空，但是该bean的BeanDefinition在缓存中存在，则获取该bean的MergedBeanDefinition</span></span><br><span class="line">    mbd = getMergedLocalBeanDefinition(beanName);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">// 5.mbd是否是合成的（这个字段比较复杂，mbd正常情况都不是合成的，也就是false)</span></span><br><span class="line">  <span class="type">boolean</span> <span class="variable">synthetic</span> <span class="operator">=</span> (mbd != <span class="literal">null</span> &amp;&amp; mbd.isSynthetic());</span><br><span class="line">  <span class="comment">// 6.从FactoryBean获取对象实例</span></span><br><span class="line">  object = getObjectFromFactoryBean(factory, beanName, !synthetic);</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// 7.返回对象实例</span></span><br><span class="line"><span class="keyword">return</span> object;</span><br></pre></td></tr></table></figure>
+
+<p>总结一下：BeanFactory 是Bean 的工厂，其中有单例池、BeanDefinition、BeanPostProcessor等等，而FactoryBean 是接口，只要实现了该接口那么获取其对象的时候，就是获取getObject 方法返回的对象，而不是获取对象本身实例。</p>
+<h3 id="FactoryBean和普通Bean的区别"><a href="#FactoryBean和普通Bean的区别" class="headerlink" title="FactoryBean和普通Bean的区别"></a>FactoryBean和普通Bean的区别</h3><p>其实这点刚刚也说了，它们之剑的区别就是获取对象实例的时候不一样，普通Bean 在单例池中获取到之后就返回了，而实现了FactoryBean 接口的对象还要继续走，直到最后调用getObject 方法返回才行。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>全文总结一下，本次说完了核心方法的全部调用，主要重点是bean 的实例化、初始化、注册等，还有一些beanPostProcessor  的两个方法调用之类的内容，再有的话就是spring 的事件传播机制了，最后也聊了一下常见的两个面试点。后续文章还是聊一下面试点：循环依赖的解决。</p>
+<h2 id="附录Spring-源码分析系列文章"><a href="#附录Spring-源码分析系列文章" class="headerlink" title="附录Spring 源码分析系列文章"></a>附录Spring 源码分析系列文章</h2><h3 id="IOC"><a href="#IOC" class="headerlink" title="IOC"></a>IOC</h3><table>
+<thead>
+<tr>
+<th align="left">时间</th>
+<th>文章</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">2022-03-09</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/09/Spring%20IOC-1/#more">Spring的基本概念和IOC流程的简述</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-11</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/11/Spring%20IOC-2/#more">IOC流程解析-BeanFactory的创建</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-14</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/14/Spring%20IOC-3/#more">IOC流程解析-BeanFactoyPostProcessor和BeanPostProcessor</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-15</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/15/Spring%20IOC-4/#more">IOC流程解析-实例化和初始化</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-17</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/17/Spring%20IOC-5/#more">IOC流程解析-循环依赖</a></td>
+</tr>
+</tbody></table>
+<h3 id="AOP"><a href="#AOP" class="headerlink" title="AOP"></a>AOP</h3><table>
+<thead>
+<tr>
+<th align="left">时间</th>
+<th>文章</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">2022-03-19</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/09/Spring%20IOC-1/#more">Spring的基本概念和IOC流程的简述</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-20</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/20/Spring%20AOP-2/#more">AOP流程源码分析-请求调用全流程</a></td>
+</tr>
+</tbody></table>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E6%A1%86%E6%9E%B6/" rel="tag"># 框架</a>
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/Spring/" rel="tag"># Spring</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2022/03/14/Spring%20IOC-3/" rel="prev" title="IOC流程解析-BeanFactoyPostProcessor和BeanPostProcessor">
+                  <i class="fa fa-chevron-left"></i> IOC流程解析-BeanFactoyPostProcessor和BeanPostProcessor
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2022/03/17/Spring%20IOC-5/" rel="next" title="IOC流程解析-循环依赖">
+                  IOC流程解析-循环依赖 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">李万青</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/next-boot.js"></script>
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+</body>
+</html>

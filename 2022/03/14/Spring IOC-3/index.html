@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 6.2.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css" integrity="sha256-DfWjNxDkM94fVBWx1H5BMMp0Zq7luBlV8QRcSES7s+0=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"example.com","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.11.1","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12},"copycode":{"enable":false,"style":null},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="本次内容要讲的是BeanFactory 创建完成并设置了BeanDefinition 之后，BeanFactoyPostProcessor 的初始化和执行，还有BeanPostProcessor 的初始化，注意今天的内容BeanPostProcessor 是不会执行的，在  Spring的基本概念和IOC流程的简述 的文章就说过了IOC 的流程图，BeanPostProcessor 的执行是在Be">
+<meta property="og:type" content="article">
+<meta property="og:title" content="IOC流程解析-BeanFactoyPostProcessor和BeanPostProcessor">
+<meta property="og:url" content="http://example.com/2022/03/14/Spring%20IOC-3/index.html">
+<meta property="og:site_name" content="茯楚博客">
+<meta property="og:description" content="本次内容要讲的是BeanFactory 创建完成并设置了BeanDefinition 之后，BeanFactoyPostProcessor 的初始化和执行，还有BeanPostProcessor 的初始化，注意今天的内容BeanPostProcessor 是不会执行的，在  Spring的基本概念和IOC流程的简述 的文章就说过了IOC 的流程图，BeanPostProcessor 的执行是在Be">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/04/23/20:49:51-image-20220423204948988.png">
+<meta property="article:published_time" content="2022-03-13T16:00:00.000Z">
+<meta property="article:modified_time" content="2022-04-28T10:11:34.881Z">
+<meta property="article:author" content="李万青">
+<meta property="article:tag" content="框架">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="Spring">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/04/23/20:49:51-image-20220423204948988.png">
+
+
+<link rel="canonical" href="http://example.com/2022/03/14/Spring%20IOC-3/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://example.com/2022/03/14/Spring%20IOC-3/","path":"2022/03/14/Spring IOC-3/","title":"IOC流程解析-BeanFactoyPostProcessor和BeanPostProcessor"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>IOC流程解析-BeanFactoyPostProcessor和BeanPostProcessor | 茯楚博客</title>
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">茯楚博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">记录整理技术文章</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90"><span class="nav-number">1.</span> <span class="nav-text">源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Bean%E5%B7%A5%E5%8E%82%E7%9A%84%E5%89%8D%E7%BD%AE%E6%93%8D%E4%BD%9C-prepareBeanFactory%E6%96%B9%E6%B3%95"><span class="nav-number">1.1.</span> <span class="nav-text">Bean工厂的前置操作-prepareBeanFactory方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Bean%E5%B7%A5%E5%8E%82%E5%90%8E%E7%BD%AE%E6%93%8D%E4%BD%9C-postProcessBeanFactory%E6%96%B9%E6%B3%95"><span class="nav-number">1.2.</span> <span class="nav-text">Bean工厂后置操作-postProcessBeanFactory方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%B0%83%E7%94%A8bean%E5%B7%A5%E5%8E%82%E5%90%8E%E7%BD%AE%E5%A4%84%E7%90%86%E5%99%A8-invokeBeanFactoryPostProcessors-%E6%96%B9%E6%B3%95"><span class="nav-number">1.3.</span> <span class="nav-text">调用bean工厂后置处理器-invokeBeanFactoryPostProcessors 方法</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E7%AC%AC%E4%B8%80%E6%AD%A5%EF%BC%9A%E5%88%A4%E6%96%ADbeanFactory"><span class="nav-number">1.3.1.</span> <span class="nav-text">第一步：判断beanFactory</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#BeanFactory%E5%90%8E%E7%BD%AE%E5%A4%84%E7%90%86%E5%99%A8-BeanDefinitionRegistryPostProcessor"><span class="nav-number">1.3.2.</span> <span class="nav-text">BeanFactory后置处理器-BeanDefinitionRegistryPostProcessor</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E7%AC%AC%E4%BA%8C%E6%AD%A5%EF%BC%9A%E5%A4%84%E7%90%86%E5%85%A5%E5%8F%82%E7%9A%84BeanFactoryPostProcessor%E9%9B%86%E5%90%88"><span class="nav-number">1.3.3.</span> <span class="nav-text">第二步：处理入参的BeanFactoryPostProcessor集合</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E7%AC%AC%E4%B8%89%E6%AD%A5%EF%BC%9A%E5%A4%84%E7%90%86%E5%BD%93%E5%89%8DBeanDefinitionRegistryPostProcessor%E7%9A%84PriorityOrdered%E5%AE%9E%E7%8E%B0"><span class="nav-number">1.3.4.</span> <span class="nav-text">第三步：处理当前BeanDefinitionRegistryPostProcessor的PriorityOrdered实现</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E7%AC%AC%E5%9B%9B%E6%AD%A5%EF%BC%9A%E5%A4%84%E7%90%86%E5%BD%93%E5%89%8DBeanDefinitionRegistryPostProcessor%E7%9A%84Ordered%E5%AE%9E%E7%8E%B0"><span class="nav-number">1.3.5.</span> <span class="nav-text">第四步：处理当前BeanDefinitionRegistryPostProcessor的Ordered实现</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%89%A7%E8%A1%8C%E4%BC%98%E5%85%88%E7%BA%A7-PriorityOrdered%E6%8E%A5%E5%8F%A3%E5%92%8COrdered%E6%8E%A5%E5%8F%A3"><span class="nav-number">1.3.6.</span> <span class="nav-text">执行优先级-PriorityOrdered接口和Ordered接口</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E7%AC%AC%E4%BA%94%E6%AD%A5%EF%BC%9A%E6%89%A7%E8%A1%8C%E5%89%A9%E4%B8%8B%E7%9A%84BeanDefinitionRegistryPostProcessors"><span class="nav-number">1.3.7.</span> <span class="nav-text">第五步：执行剩下的BeanDefinitionRegistryPostProcessors</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E7%AC%AC%E5%85%AD%E6%AD%A5%EF%BC%9A%E6%89%A7%E8%A1%8C%E6%89%80%E6%9C%89%E7%9A%84BeanDefinitionRegistryPostProcessors%E5%AE%9E%E7%8E%B0%E7%9A%84postProcessBeanFactory%E6%96%B9%E6%B3%95"><span class="nav-number">1.3.8.</span> <span class="nav-text">第六步：执行所有的BeanDefinitionRegistryPostProcessors实现的postProcessBeanFactory方法</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E7%AC%AC%E4%B8%83%E6%AD%A5%E5%88%B0%E6%9C%80%E5%90%8E%E4%B8%80%E6%AD%A5%EF%BC%9A%E6%89%A7%E8%A1%8CBeanFactoryPostProcessor%E7%9A%84%E5%AE%9E%E7%8E%B0"><span class="nav-number">1.3.9.</span> <span class="nav-text">第七步到最后一步：执行BeanFactoryPostProcessor的实现</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%B0%8F%E7%BB%93%EF%BC%9A%E6%96%B9%E6%B3%95%E4%BD%9C%E7%94%A8%E5%8F%8A%E4%BC%98%E5%85%88%E7%BA%A7%E9%A1%BA%E5%BA%8F"><span class="nav-number">1.3.10.</span> <span class="nav-text">小结：方法作用及优先级顺序</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B3%A8%E5%86%8CBean%E5%90%8E%E7%BD%AE%E5%A4%84%E7%90%86%E5%99%A8-registerBeanPostProcessors%E6%96%B9%E6%B3%95"><span class="nav-number">1.4.</span> <span class="nav-text">注册Bean后置处理器-registerBeanPostProcessors方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Bean%E5%90%8E%E7%BD%AE%E6%89%A7%E8%A1%8C%E5%99%A8%E7%9A%84%E5%AE%9E%E7%8E%B0-BeanPostProcessor%E6%8E%A5%E5%8F%A3"><span class="nav-number">1.5.</span> <span class="nav-text">Bean后置执行器的实现-BeanPostProcessor接口</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">2.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%99%84%E5%BD%95Spring-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E7%B3%BB%E5%88%97%E6%96%87%E7%AB%A0"><span class="nav-number">3.</span> <span class="nav-text">附录Spring 源码分析系列文章</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#IOC"><span class="nav-number">3.1.</span> <span class="nav-text">IOC</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#AOP"><span class="nav-number">3.2.</span> <span class="nav-text">AOP</span></a></li></ol></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="李万青"
+      src="/images/8a06cd0a8da6a6848b7a0b37b32164b7.jpeg">
+  <p class="site-author-name" itemprop="name">李万青</p>
+  <div class="site-description" itemprop="description">苦心人天不负</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">14</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/liwqtm/liwqtm.github.io" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;liwqtm&#x2F;liwqtm.github.io" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll site-overview-item animated">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/m0_51464746?type=blog" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;m0_51464746?type&#x3D;blog" rel="noopener" target="_blank">张怀猛的博客</a>
+        </li>
+    </ul>
+  </div>
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2022/03/14/Spring%20IOC-3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/8a06cd0a8da6a6848b7a0b37b32164b7.jpeg">
+      <meta itemprop="name" content="李万青">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="茯楚博客">
+      <meta itemprop="description" content="苦心人天不负">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="IOC流程解析-BeanFactoyPostProcessor和BeanPostProcessor | 茯楚博客">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          IOC流程解析-BeanFactoyPostProcessor和BeanPostProcessor
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2022-03-14 00:00:00" itemprop="dateCreated datePublished" datetime="2022-03-14T00:00:00+08:00">2022-03-14</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-04-28 18:11:34" itemprop="dateModified" datetime="2022-04-28T18:11:34+08:00">2022-04-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Java%E6%A1%86%E6%9E%B6/" itemprop="url" rel="index"><span itemprop="name">Java框架</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Java%E6%A1%86%E6%9E%B6/Spring/" itemprop="url" rel="index"><span itemprop="name">Spring</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>本次内容要讲的是BeanFactory 创建完成并设置了BeanDefinition 之后，BeanFactoyPostProcessor 的初始化和执行，还有BeanPostProcessor 的初始化，注意今天的内容BeanPostProcessor 是不会执行的，在  <a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/09/Spring%20IOC-1/#more">Spring的基本概念和IOC流程的简述</a> 的文章就说过了IOC 的流程图，BeanPostProcessor 的执行是在Bean 实例化之后。</p>
+<h2 id="源码分析"><a href="#源码分析" class="headerlink" title="源码分析"></a>源码分析</h2><p>接着上篇文章（上篇文章是：  <a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/11/Spring%20IOC-2/#more">IOC流程解析-BeanFactory的创建</a>）继续讲IOC 的核心方法refresh 方法的内容，之前讲完了obtainFreshBeanFactory 方法的调用，那么下一步就是prepareBeanFactory 方法了。<span id="more"></span></p>
+<h3 id="Bean工厂的前置操作-prepareBeanFactory方法"><a href="#Bean工厂的前置操作-prepareBeanFactory方法" class="headerlink" title="Bean工厂的前置操作-prepareBeanFactory方法"></a>Bean工厂的前置操作-prepareBeanFactory方法</h3><p>这个方法不是重点方法，所以代码就不细说了，按照代码流程简单说一下这个方法的主要了些什么，作用如下：</p>
+<ol>
+<li>首先就是给beanFactory 设置一些属性，如类加载器、注册解析器之类；</li>
+<li>然后就是添加第一个beanPostProcessor 后置处理器（注意：这里是bean，不是beanFactory），这个后置处理器会添加到beanFactory 的私有常量集合beanPostProcessors 集合属性中，而这个后置处理器ApplicationContextAwareProcessor 处理器，其主要作用就是为了在bean 初始化的时候，判断bean 是否都实现了ApplicationContextAware、EnvironmentAware之类接口，然后为其注入对应的applicationContext 对象；</li>
+<li>然后就是设置一些忽略接口，比如刚刚说的ApplicationContextAware，因为这些spring 自己会做处理，接着就是对特殊的几个bean依赖做处理，这里不用深究；</li>
+<li>然后就是添加第二个beanPostProcessor 后置处理器，这个是ApplicationListenerDetector 处理器，其主要做用就是为实现ApplicationListener 接口的对象初始化的时候，将其注册到一个监听列表中。这里涉及到spring 的事件传播机制，这个后续再说，会结合上篇所说到的dubbo 标签解析内容一起再细说一次；</li>
+<li>最后一个重点，这里会创建三个完整对象，并添加到单例池中，<strong>单例池就是beanFactory 的私有常量集合singletonObjects 集合</strong>，这也是我们常说的IOC 容器、一级缓存。后面bean 初始化完成后得到的完整对象就是存入这个集合中。说回三个完整对象，其实就是对系统和beanFactory 的一些配置信息，后面需要使用的话可以直接通过对象获取。</li>
+</ol>
+<h3 id="Bean工厂后置操作-postProcessBeanFactory方法"><a href="#Bean工厂后置操作-postProcessBeanFactory方法" class="headerlink" title="Bean工厂后置操作-postProcessBeanFactory方法"></a>Bean工厂后置操作-postProcessBeanFactory方法</h3><p>prepareBeanFactory方法结束后，接下来就是postProcessBeanFactory 方法，但是这个方法就是提供一个模板，可以自己实现接口，重写这个方法来实现自己的业务逻辑，它本身没有任何的代码逻辑。</p>
+<h3 id="调用bean工厂后置处理器-invokeBeanFactoryPostProcessors-方法"><a href="#调用bean工厂后置处理器-invokeBeanFactoryPostProcessors-方法" class="headerlink" title="调用bean工厂后置处理器-invokeBeanFactoryPostProcessors 方法"></a>调用bean工厂后置处理器-invokeBeanFactoryPostProcessors 方法</h3><p>这一步就已经到了BeanFactoryPostProcessors 的构建和调用过程了，也算是今天的重点之一。</p>
+<p>跟进具体方法，其重点是继续invokeBeanFactoryPostProcessors 方法的调用，继续跟进的话，这里的内容就多了去了，不过逻辑并不复杂，我们一步一步跟重点看。不过这里需要注意一点该方法的第二个入参getBeanFactoryPostProcessors 方法返回值，这里是当前应用上下文中已经注册的BeanFactoryPostProcessor，也就是只有多容器启动的时候这个返回才有值。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 1.getBeanFactoryPostProcessors(): 获取当前应用上下文中已经注册的 BeanFactoryPostProcessor</span></span><br><span class="line"><span class="comment">// 2.invokeBeanFactoryPostProcessors : 实例化并调用所有已注册的BeanFactoryPostProcessors变量中的值</span></span><br><span class="line">PostProcessorRegistrationDelegate.invokeBeanFactoryPostProcessors(beanFactory, getBeanFactoryPostProcessors());</span><br></pre></td></tr></table></figure>
+
+<p>进入invokeBeanFactoryPostProcessors 方法。</p>
+<h4 id="第一步：判断beanFactory"><a href="#第一步：判断beanFactory" class="headerlink" title="第一步：判断beanFactory"></a>第一步：判断beanFactory</h4><p>判断beanFactory 是否为BeanDefinitionRegistry，之前<a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/04/09/Spring%20IOC%EF%BC%88%E4%B8%80%EF%BC%89/#more">Spring的基本概念和IOC流程的简述</a> 文章中介绍bean 组件的时候有说过beanFactory 的最底层子类是DefaultListableBeanFactory，而该类又实现了BeanDefinitionRegistry，我们目前传入的对象就是DefaultListableBeanFactory，所以这里一定是满足的。</p>
+<p>然后看到这里会声明两个集合，一是：用于保存普通的BeanFactoryPostProcessor类型的后置处理器、还有一个是：保存BeanDefinitionRegistryPostProcessor类型的后置处理器，由此可以知道BeanFactory 后置处理器为两个实现类型。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 1. 判断beanFactory是否为BeanDefinitionRegistry</span></span><br><span class="line"><span class="comment">// beanFactory类型为DefaultListableBeanFactory，DefaultListableBeanFactory实现了BeanDefinitionRegistry，所有为true</span></span><br><span class="line"><span class="keyword">if</span> (beanFactory <span class="keyword">instanceof</span> BeanDefinitionRegistry) &#123;</span><br><span class="line">  <span class="comment">// 类型强转</span></span><br><span class="line">  <span class="type">BeanDefinitionRegistry</span> <span class="variable">registry</span> <span class="operator">=</span> (BeanDefinitionRegistry) beanFactory;</span><br><span class="line">  <span class="comment">// 声明集合：保存普通的BeanFactoryPostProcessor类型的后置处理器</span></span><br><span class="line">  List&lt;BeanFactoryPostProcessor&gt; regularPostProcessors = <span class="keyword">new</span> <span class="title class_">ArrayList</span>&lt;&gt;();</span><br><span class="line">  <span class="comment">// 声明集合：保存BeanDefinitionRegistryPostProcessor类型的后置处理器</span></span><br><span class="line">  List&lt;BeanDefinitionRegistryPostProcessor&gt; registryProcessors = <span class="keyword">new</span> <span class="title class_">ArrayList</span>&lt;&gt;();</span><br></pre></td></tr></table></figure>
+
+<h4 id="BeanFactory后置处理器-BeanDefinitionRegistryPostProcessor"><a href="#BeanFactory后置处理器-BeanDefinitionRegistryPostProcessor" class="headerlink" title="BeanFactory后置处理器-BeanDefinitionRegistryPostProcessor"></a>BeanFactory后置处理器-BeanDefinitionRegistryPostProcessor</h4><p>BeanFactoryPostProcessor 这个后置处理器没有什么好说的，只要实现了这个接口，那么就是BeanFactory 的后置处理器。</p>
+<p>我们目前要知道的是BeanDefinitionRegistryPostProcessor，这个接口是BeanFactoryPostProcessor 接口的子类接口。它这里可以看做是对于原本普通的BeanFactoryPostProcessor 进行了一次加强，也就说如果实现该接口，不光要实现BeanFactoryPostProcessor 接口的方法，还要实现该接口本身的方法。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">interface</span> <span class="title class_">BeanDefinitionRegistryPostProcessor</span> <span class="keyword">extends</span> <span class="title class_">BeanFactoryPostProcessor</span> &#123;</span><br><span class="line">	<span class="keyword">void</span> <span class="title function_">postProcessBeanDefinitionRegistry</span><span class="params">(BeanDefinitionRegistry registry)</span> <span class="keyword">throws</span> BeansException;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="第二步：处理入参的BeanFactoryPostProcessor集合"><a href="#第二步：处理入参的BeanFactoryPostProcessor集合" class="headerlink" title="第二步：处理入参的BeanFactoryPostProcessor集合"></a>第二步：处理入参的BeanFactoryPostProcessor集合</h4><p>这里继续刚刚的invokeBeanFactoryPostProcessors 方法。</p>
+<p>接下来是处理刚刚传入参数的BeanFactoryPostProcessor 集合，也就是上面说的getBeanFactoryPostProcessors 方法的返回值。这里的处理也就是简单的调用而已，因为这个集合是注册在其余容器中了的，所以优先级之类的已经处理过了，这里我们不重点看。</p>
+<p>但是需要注意的是：这里执行的只有BeanDefinitionRegistryPostProcessor 的实现，BeanFactoryPostProcessor 的实现类是没有执行对应的方法的，但是这个两种接口实现都会存入上面声明的集合。</p>
+<h4 id="第三步：处理当前BeanDefinitionRegistryPostProcessor的PriorityOrdered实现"><a href="#第三步：处理当前BeanDefinitionRegistryPostProcessor的PriorityOrdered实现" class="headerlink" title="第三步：处理当前BeanDefinitionRegistryPostProcessor的PriorityOrdered实现"></a>第三步：处理当前BeanDefinitionRegistryPostProcessor的PriorityOrdered实现</h4><p>下一步是再次声明一个集合用于保存本次要执行的BeanDefinitionRegistryPostProcessor。</p>
+<p>然后就是通过beanFactory 获取到所有的实现了BeanDefinitionRegistryPostProcessor 接口的对象，这里我们其实还可以看出：如果存在多个执行器的话，目前的执行顺序就是配置信息的解析顺序。</p>
+<p>接下来就是循环上面获取的集合，然后就是筛选出接口实现，并添加相应集合。</p>
+<p>然后在此将要执行的集合再次排序，依据就是否是实现了Ordered 接口，还有其接口实现的order 值。然后添加上面声明的registryProcessors 集合，最后执行处理好的currentRegistryProcessors 集合，并在执行完成之后清空关闭该集合。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 定义集合：用于保存本次要执行的BeanDefinitionRegistryPostProcessor</span></span><br><span class="line">List&lt;BeanDefinitionRegistryPostProcessor&gt; currentRegistryProcessors = <span class="keyword">new</span> <span class="title class_">ArrayList</span>&lt;&gt;();</span><br><span class="line"></span><br><span class="line"><span class="comment">// First, invoke the BeanDefinitionRegistryPostProcessors that implement PriorityOrdered.</span></span><br><span class="line"><span class="comment">// 3.调用所有实现了PriorityOrdered接口的BeanDefinitionRegistryPostProcessors</span></span><br><span class="line"><span class="comment">// 3.1 找出所有实现了PriorityOrdered接口的Bean的beanName</span></span><br><span class="line">String[] postProcessorNames =</span><br><span class="line">  beanFactory.getBeanNamesForType(BeanDefinitionRegistryPostProcessor.class, <span class="literal">true</span>, <span class="literal">false</span>);</span><br><span class="line"><span class="comment">// 3.2 遍历postProcessorNames</span></span><br><span class="line"><span class="keyword">for</span> (String ppName : postProcessorNames) &#123;</span><br><span class="line">  <span class="comment">// 3.3 校验是否实现了PriorityOrdered接口</span></span><br><span class="line">  <span class="keyword">if</span> (beanFactory.isTypeMatch(ppName, PriorityOrdered.class)) &#123;</span><br><span class="line">    <span class="comment">// 3.4 获取ppName对应regular的bean实例，添加到currentRegistryProcessors</span></span><br><span class="line">    currentRegistryProcessors.add(beanFactory.getBean(ppName, BeanDefinitionRegistryPostProcessor.class));</span><br><span class="line">    <span class="comment">// 3.5 将要被执行的加入processedBeans，避免后续重复执行</span></span><br><span class="line">    processedBeans.add(ppName);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// 3.6 进行排序(根据是否实现PriorityOrdered、Ordered接口和order值来排序)</span></span><br><span class="line">sortPostProcessors(currentRegistryProcessors, beanFactory);</span><br><span class="line"><span class="comment">// 3.7 添加到registryProcessors(用于最后执行postProcessBeanFactory方法)</span></span><br><span class="line">registryProcessors.addAll(currentRegistryProcessors);</span><br><span class="line"><span class="comment">// 3.8 遍历currentRegistryProcessors, 执行postProcessBeanDefinitionRegistry方法</span></span><br><span class="line">invokeBeanDefinitionRegistryPostProcessors(currentRegistryProcessors, registry);</span><br><span class="line"><span class="comment">// 3.9 执行完毕后, 清空currentRegistryProcessors</span></span><br><span class="line">currentRegistryProcessors.clear();</span><br></pre></td></tr></table></figure>
+
+<h4 id="第四步：处理当前BeanDefinitionRegistryPostProcessor的Ordered实现"><a href="#第四步：处理当前BeanDefinitionRegistryPostProcessor的Ordered实现" class="headerlink" title="第四步：处理当前BeanDefinitionRegistryPostProcessor的Ordered实现"></a>第四步：处理当前BeanDefinitionRegistryPostProcessor的Ordered实现</h4><p>逻辑跟上面一样，先获取、再筛选、再排序、最后执行实现对象的对应方法，并清空关闭集合。没有什么可以聊的，不过需要注意的是这里和上面执行的都是BeanDefinitionRegistryPostProcessor 接口的postProcessBeanDefinitionRegistry 方法，BeanFactoryPostProcessor 接口对应的方法是还没有执行的。</p>
+<p>对了这里还要注意一个校验执行过的，是不能重复执行的，也就是processedBeans 集合的作用。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 4.调用所有实现了Ordered接口的BeanDefinitionRegistryPostProcessor实现类（过程跟上面的步骤3基本一样）</span></span><br><span class="line"><span class="comment">// 4.1 找出所有实现BeanDefinitionRegistryPostProcessor接口的类, 这边重复查找是因为执行完上面的BeanDefinitionRegistryPostProcessor,</span></span><br><span class="line"><span class="comment">// 可能会新增了其他的BeanDefinitionRegistryPostProcessor, 因此需要重新查找</span></span><br><span class="line">postProcessorNames = beanFactory.getBeanNamesForType(BeanDefinitionRegistryPostProcessor.class, <span class="literal">true</span>, <span class="literal">false</span>);</span><br><span class="line"><span class="keyword">for</span> (String ppName : postProcessorNames) &#123;</span><br><span class="line">  <span class="comment">// 校验是否实现了Ordered接口，并且还未执行过</span></span><br><span class="line">  <span class="keyword">if</span> (!processedBeans.contains(ppName) &amp;&amp; beanFactory.isTypeMatch(ppName, Ordered.class)) &#123;</span><br><span class="line">    currentRegistryProcessors.add(beanFactory.getBean(ppName, BeanDefinitionRegistryPostProcessor.class));</span><br><span class="line">    processedBeans.add(ppName);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line">sortPostProcessors(currentRegistryProcessors, beanFactory);</span><br><span class="line">registryProcessors.addAll(currentRegistryProcessors);</span><br><span class="line"><span class="comment">// 4.2 遍历currentRegistryProcessors, 执行postProcessBeanDefinitionRegistry方法</span></span><br><span class="line">invokeBeanDefinitionRegistryPostProcessors(currentRegistryProcessors, registry);</span><br><span class="line">currentRegistryProcessors.clear();</span><br></pre></td></tr></table></figure>
+
+<h4 id="执行优先级-PriorityOrdered接口和Ordered接口"><a href="#执行优先级-PriorityOrdered接口和Ordered接口" class="headerlink" title="执行优先级-PriorityOrdered接口和Ordered接口"></a>执行优先级-PriorityOrdered接口和Ordered接口</h4><p>这两个接口的优先级，从上面的代码也可以看出来PriorityOrdered 接口实现要优先于Ordered 接口实现。PriorityOrdered 接口更像是一个标识，它本身没有方法，它的父类就是Ordered 接口，这个接口有一个getOrder 方法，用于编写优先级。具体实现如下。其返回数字越大，优先级越大。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="keyword">public</span> <span class="type">int</span> <span class="title function_">getOrder</span><span class="params">()</span> &#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="第五步：执行剩下的BeanDefinitionRegistryPostProcessors"><a href="#第五步：执行剩下的BeanDefinitionRegistryPostProcessors" class="headerlink" title="第五步：执行剩下的BeanDefinitionRegistryPostProcessors"></a>第五步：执行剩下的BeanDefinitionRegistryPostProcessors</h4><p>首先是通过循环筛选出剩下的所有BeanDefinitionRegistryPostProcessors 的实现类，然后排序、添加集合、执行调用该接口的postProcessBeanDefinitionRegistry 方法，清空关闭currentRegistryProcessors 集合，老套路了，没有什么好说的。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 5.最后, 调用所有剩下的BeanDefinitionRegistryPostProcessors</span></span><br><span class="line"><span class="type">boolean</span> <span class="variable">reiterate</span> <span class="operator">=</span> <span class="literal">true</span>;</span><br><span class="line"><span class="keyword">while</span> (reiterate) &#123;</span><br><span class="line">  reiterate = <span class="literal">false</span>;</span><br><span class="line">  <span class="comment">// 5.1 找出所有实现BeanDefinitionRegistryPostProcessor接口的类</span></span><br><span class="line">  postProcessorNames = beanFactory.getBeanNamesForType(BeanDefinitionRegistryPostProcessor.class, <span class="literal">true</span>, <span class="literal">false</span>);</span><br><span class="line">  <span class="keyword">for</span> (String ppName : postProcessorNames) &#123;</span><br><span class="line">    <span class="comment">// 5.2 跳过已经执行过的</span></span><br><span class="line">    <span class="keyword">if</span> (!processedBeans.contains(ppName)) &#123;</span><br><span class="line">      currentRegistryProcessors.add(beanFactory.getBean(ppName, BeanDefinitionRegistryPostProcessor.class));</span><br><span class="line">      processedBeans.add(ppName);</span><br><span class="line">      <span class="comment">// 5.3 如果有BeanDefinitionRegistryPostProcessor被执行, 则有可能会产生新的BeanDefinitionRegistryPostProcessor,</span></span><br><span class="line">      <span class="comment">// 因此这边将reiterate赋值为true, 代表需要再循环查找一次</span></span><br><span class="line">      reiterate = <span class="literal">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  sortPostProcessors(currentRegistryProcessors, beanFactory);</span><br><span class="line">  registryProcessors.addAll(currentRegistryProcessors);</span><br><span class="line">  <span class="comment">// 5.4 遍历currentRegistryProcessors, 执行postProcessBeanDefinitionRegistry方法</span></span><br><span class="line">  invokeBeanDefinitionRegistryPostProcessors(currentRegistryProcessors, registry);</span><br><span class="line">  currentRegistryProcessors.clear();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="第六步：执行所有的BeanDefinitionRegistryPostProcessors实现的postProcessBeanFactory方法"><a href="#第六步：执行所有的BeanDefinitionRegistryPostProcessors实现的postProcessBeanFactory方法" class="headerlink" title="第六步：执行所有的BeanDefinitionRegistryPostProcessors实现的postProcessBeanFactory方法"></a>第六步：执行所有的BeanDefinitionRegistryPostProcessors实现的postProcessBeanFactory方法</h4><p>到这里是执行所有的，注意是所有的BeanDefinitionRegistryPostProcessors 实现的postProcessBeanFactory方法，也就是其父类接口对应的方法，之前执行的方法都是它自己定义的，然后是执行入参集合中的postProcessBeanFactory方法。</p>
+<p>这里所有的BeanDefinitionRegistryPostProcessors 实现算是执行完成了。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Now, invoke the postProcessBeanFactory callback of all processors handled so far.</span></span><br><span class="line"><span class="comment">// 6.调用所有BeanDefinitionRegistryPostProcessor的postProcessBeanFactory方法(BeanDefinitionRegistryPostProcessor继承自BeanFactoryPostProcessor)</span></span><br><span class="line">invokeBeanFactoryPostProcessors(registryProcessors, beanFactory);</span><br><span class="line"><span class="comment">// 7.最后, 调用入参beanFactoryPostProcessors中的普通BeanFactoryPostProcessor的postProcessBeanFactory方法</span></span><br><span class="line">invokeBeanFactoryPostProcessors(regularPostProcessors, beanFactory);</span><br></pre></td></tr></table></figure>
+
+<h4 id="第七步到最后一步：执行BeanFactoryPostProcessor的实现"><a href="#第七步到最后一步：执行BeanFactoryPostProcessor的实现" class="headerlink" title="第七步到最后一步：执行BeanFactoryPostProcessor的实现"></a>第七步到最后一步：执行BeanFactoryPostProcessor的实现</h4><p>这里就不展示代码了，因为套路是一模一样的，唯一的区别就是获取的接口实现不一样而已。</p>
+<p>这个方法就算是结束了。</p>
+<h4 id="小结：方法作用及优先级顺序"><a href="#小结：方法作用及优先级顺序" class="headerlink" title="小结：方法作用及优先级顺序"></a>小结：方法作用及优先级顺序</h4><p>这个方法其主要作用就是执行所有的BeanFactoryPostProcessor 接口和子类接口的相关实现，如果是多容器启动的话，其余容器的BeanFactory 执行器也要再次执行。</p>
+<p>不同方法执行优先级总结：其余容器的BeanDefinitionRegistryPostProcessors 实现的postProcessBeanDefinitionRegistry 方法  <strong>&gt;</strong> 当前容器的BeanDefinitionRegistryPostProcessors 实现的postProcessBeanDefinitionRegistry 方法 <strong>&gt;</strong> 其余容器的BeanDefinitionRegistryPostProcessors 实现的postProcessBeanFactory 方法 <strong>&gt;</strong> 当前容器的BeanDefinitionRegistryPostProcessors 实现的postProcessBeanFactory 方法 <strong>&gt;</strong> 其余容器的BeanDefinitionPostProcessors 实现的postProcessBeanFactory 方法 <strong>&gt;</strong> 当前容器的BeanDefinitionPostProcessors 实现的postProcessBeanFactory。</p>
+<p>同一方法执行优先级总结：实现PriorityOrdered 接口 <strong>&gt;</strong> 实现Ordered接口 <strong>&gt;</strong> 配置文件配置顺序；实现同一接口是：按照getOrder 方法返回的数字排序，数字越大优先级越高。</p>
+<h3 id="注册Bean后置处理器-registerBeanPostProcessors方法"><a href="#注册Bean后置处理器-registerBeanPostProcessors方法" class="headerlink" title="注册Bean后置处理器-registerBeanPostProcessors方法"></a>注册Bean后置处理器-registerBeanPostProcessors方法</h3><p>看完了bean工厂后置处理器的执行，在回到核心refresh 方法继续看。</p>
+<p>接下来是Bean 的后置处理器，注意不是beanFactory 的了，同时这里是register 注册没有调用的内容。清楚这点后，我们再看代码。</p>
+<p>跟进方法，没有什么内容就是调用PostProcessorRegistrationDelegate 对象的注册方法，继续跟进后内容跟上面的一样多，不过都是老套路，我们就看下区别点就行了。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title function_">registerBeanPostProcessors</span><span class="params">(ConfigurableListableBeanFactory beanFactory)</span> &#123;</span><br><span class="line">  <span class="comment">// 1.注册BeanPostProcessor</span></span><br><span class="line">  PostProcessorRegistrationDelegate.registerBeanPostProcessors(beanFactory, <span class="built_in">this</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>跟进该方法。</p>
+<p>首先获取所有的BeanPostProcessor 接口的实现。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">// 1.找出所有实现BeanPostProcessor接口的类</span><br><span class="line">String[] postProcessorNames = beanFactory.getBeanNamesForType(BeanPostProcessor.class, true, false);</span><br></pre></td></tr></table></figure>
+
+<p>然后记一下数据量，并存入beanFactory 中。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">// BeanPostProcessor的目标计数</span><br><span class="line">int beanProcessorTargetCount = beanFactory.getBeanPostProcessorCount() + 1 + postProcessorNames.length;</span><br><span class="line"></span><br><span class="line">// 2.添加BeanPostProcessorChecker(主要用于记录信息)到beanFactory中</span><br><span class="line">beanFactory.addBeanPostProcessor(new BeanPostProcessorChecker(beanFactory, beanProcessorTargetCount));</span><br></pre></td></tr></table></figure>
+
+<p>然后就是老三样、筛选、排序、保存集合、然后注意这里不是执行对应接口方法，而是注册。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 5.2 注册priorityOrderedPostProcessors</span></span><br><span class="line">registerBeanPostProcessors(beanFactory, priorityOrderedPostProcessors);</span><br></pre></td></tr></table></figure>
+
+<p>也就是存入beanFactory 中。不过这里其实已经添加过几个BeanPostProcessor 了，就是上面的前置作用内容添加的。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">registerBeanPostProcessors</span><span class="params">(</span></span><br><span class="line"><span class="params">  ConfigurableListableBeanFactory beanFactory, List&lt;BeanPostProcessor&gt; postProcessors)</span> &#123;</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 1.遍历postProcessors</span></span><br><span class="line">  <span class="keyword">for</span> (BeanPostProcessor postProcessor : postProcessors) &#123;</span><br><span class="line">    <span class="comment">// 2.将PostProcessor添加到BeanFactory中的beanPostProcessors缓存</span></span><br><span class="line">    beanFactory.addBeanPostProcessor(postProcessor);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>说到上面添加的处理器，这个方法的最后一部分就是想将它们再次注册，也就是移动到处理链末尾。</p>
+<p>然后这个方法就结束了。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 8.最后, 重新注册所有内部BeanPostProcessors（相当于内部的BeanPostProcessor会被移到处理器链的末尾）</span></span><br><span class="line"><span class="comment">// 8.1 对internalPostProcessors进行排序</span></span><br><span class="line">sortPostProcessors(internalPostProcessors, beanFactory);</span><br><span class="line"><span class="comment">// 8.2注册internalPostProcessors</span></span><br><span class="line">registerBeanPostProcessors(beanFactory, internalPostProcessors);</span><br><span class="line"></span><br><span class="line"><span class="comment">// Re-register post-processor for detecting inner beans as ApplicationListeners,</span></span><br><span class="line"><span class="comment">// moving it to the end of the processor chain (for picking up proxies etc).</span></span><br><span class="line"><span class="comment">// 9.重新注册ApplicationListenerDetector（跟8类似，主要是为了移动到处理器链的末尾）</span></span><br><span class="line">beanFactory.addBeanPostProcessor(<span class="keyword">new</span> <span class="title class_">ApplicationListenerDetector</span>(applicationContext));</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h3 id="Bean后置执行器的实现-BeanPostProcessor接口"><a href="#Bean后置执行器的实现-BeanPostProcessor接口" class="headerlink" title="Bean后置执行器的实现-BeanPostProcessor接口"></a>Bean后置执行器的实现-BeanPostProcessor接口</h3><p>这里还要说一点就是Bean 后置执行器就是BeanPostProcessor 接口的实现，这一点从上面的代码中也可以看出来，我们这里要说的是BeanPostProcessor 接口中的postProcessBeforeInitialization 方法和postProcessAfterInitialization 方法，这两个方法名称的差别非常的小，要注意看前者是Before，后者是After。从名字看也能知道前者是前置方法，后者是后置方法，这样读起来也很有意思，Bean后置执行器的前置方法和后置方法。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">interface</span> <span class="title class_">BeanPostProcessor</span> &#123;</span><br><span class="line"></span><br><span class="line">	<span class="meta">@Nullable</span></span><br><span class="line">	<span class="keyword">default</span> Object <span class="title function_">postProcessBeforeInitialization</span><span class="params">(Object bean, String beanName)</span> <span class="keyword">throws</span> BeansException &#123;</span><br><span class="line">		<span class="keyword">return</span> bean;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="meta">@Nullable</span></span><br><span class="line">	<span class="keyword">default</span> Object <span class="title function_">postProcessAfterInitialization</span><span class="params">(Object bean, String beanName)</span> <span class="keyword">throws</span> BeansException &#123;</span><br><span class="line">		<span class="keyword">return</span> bean;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>结合之前文章[Spring的基本概念和IOC流程的简述](<a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/04/09/Spring">https://liwqtm.github.io/2022/04/09/Spring</a> IOC（一）&#x2F;#more) 的IOC 流程图可以看出，这两个方法的执行时机是在bean 的初始化部分，同时After 后置方法还存在aop 的实现内容，这个我们后面再说，目前要明白Bean 后置执行器是如何去实现的，并且重写了哪两个方法即可。</p>
+<img src="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/04/23/20:49:51-image-20220423204948988.png" alt="image-20220423204948988" style="zoom: 50%;" />
+
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>本次就是继上篇<a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/04/11/Spring%20IOC%EF%BC%88%E4%BA%8C%EF%BC%89/#more">IOC流程解析-BeanFactory的创建</a> 后说了refresh 核心方法中的后面四个方法，其主要作用就是BeanFactory 的前置操作、BeanFactory 的后置处理器执行、Bean 后置处理的注册。简单来说还是一些BeanFactory 的处理，是实例化和初始化之前的大部分内容了，后面就是初始化和实例化了。</p>
+<h2 id="附录Spring-源码分析系列文章"><a href="#附录Spring-源码分析系列文章" class="headerlink" title="附录Spring 源码分析系列文章"></a>附录Spring 源码分析系列文章</h2><h3 id="IOC"><a href="#IOC" class="headerlink" title="IOC"></a>IOC</h3><table>
+<thead>
+<tr>
+<th align="left">时间</th>
+<th>文章</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">2022-03-09</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/09/Spring%20IOC-1/#more">Spring的基本概念和IOC流程的简述</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-11</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/11/Spring%20IOC-2/#more">IOC流程解析-BeanFactory的创建</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-14</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/14/Spring%20IOC-3/#more">IOC流程解析-BeanFactoyPostProcessor和BeanPostProcessor</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-15</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/15/Spring%20IOC-4/#more">IOC流程解析-实例化和初始化</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-17</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/17/Spring%20IOC-5/#more">IOC流程解析-循环依赖</a></td>
+</tr>
+</tbody></table>
+<h3 id="AOP"><a href="#AOP" class="headerlink" title="AOP"></a>AOP</h3><table>
+<thead>
+<tr>
+<th align="left">时间</th>
+<th>文章</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">2022-03-19</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/09/Spring%20IOC-1/#more">Spring的基本概念和IOC流程的简述</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-20</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/20/Spring%20AOP-2/#more">AOP流程源码分析-请求调用全流程</a></td>
+</tr>
+</tbody></table>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E6%A1%86%E6%9E%B6/" rel="tag"># 框架</a>
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/Spring/" rel="tag"># Spring</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2022/03/11/Spring%20IOC-2/" rel="prev" title="IOC流程解析-BeanFactory的创建">
+                  <i class="fa fa-chevron-left"></i> IOC流程解析-BeanFactory的创建
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2022/03/15/Spring%20IOC-4/" rel="next" title="IOC流程解析-实例化和初始化">
+                  IOC流程解析-实例化和初始化 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">李万青</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/next-boot.js"></script>
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+</body>
+</html>

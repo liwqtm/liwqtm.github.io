@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 6.2.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css" integrity="sha256-DfWjNxDkM94fVBWx1H5BMMp0Zq7luBlV8QRcSES7s+0=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"example.com","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.11.1","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12},"copycode":{"enable":false,"style":null},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="Spring IOC 一系列文章下来，我们已经了解了整个spring IOC 核心refresh 方法的全部内容，这个方法名我是每篇文章都有提到，一定要记住。本次就聊一下IOC 的最后一个知识点：循环依赖的问题。 什么是循环依赖？很多小伙伴都在各种渠道听到过“循环依赖”这个词，也应该有一定了解，但是我这里还是要重新在具体描述一下循环依赖的概念。 循环依赖是指：在spring IOC 容器初始化的时">
+<meta property="og:type" content="article">
+<meta property="og:title" content="IOC流程解析-循环依赖">
+<meta property="og:url" content="http://example.com/2022/03/17/Spring%20IOC-5/index.html">
+<meta property="og:site_name" content="茯楚博客">
+<meta property="og:description" content="Spring IOC 一系列文章下来，我们已经了解了整个spring IOC 核心refresh 方法的全部内容，这个方法名我是每篇文章都有提到，一定要记住。本次就聊一下IOC 的最后一个知识点：循环依赖的问题。 什么是循环依赖？很多小伙伴都在各种渠道听到过“循环依赖”这个词，也应该有一定了解，但是我这里还是要重新在具体描述一下循环依赖的概念。 循环依赖是指：在spring IOC 容器初始化的时">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/04/25/09:46:53-image-20220425094652262.png">
+<meta property="article:published_time" content="2022-03-16T16:00:00.000Z">
+<meta property="article:modified_time" content="2022-04-28T10:12:12.629Z">
+<meta property="article:author" content="李万青">
+<meta property="article:tag" content="框架">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="Spring">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/04/25/09:46:53-image-20220425094652262.png">
+
+
+<link rel="canonical" href="http://example.com/2022/03/17/Spring%20IOC-5/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://example.com/2022/03/17/Spring%20IOC-5/","path":"2022/03/17/Spring IOC-5/","title":"IOC流程解析-循环依赖"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>IOC流程解析-循环依赖 | 茯楚博客</title>
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">茯楚博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">记录整理技术文章</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BB%80%E4%B9%88%E6%98%AF%E5%BE%AA%E7%8E%AF%E4%BE%9D%E8%B5%96%EF%BC%9F"><span class="nav-number">1.</span> <span class="nav-text">什么是循环依赖？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Spring%E6%98%AF%E5%A6%82%E4%BD%95%E8%A7%A3%E5%86%B3%E5%BE%AA%E7%8E%AF%E4%BE%9D%E8%B5%96%E7%9A%84"><span class="nav-number">2.</span> <span class="nav-text">Spring是如何解决循环依赖的</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%8E%B7%E5%8F%96%E5%AE%8C%E6%95%B4%E5%AF%B9%E8%B1%A1%E7%9A%84%E6%96%B9%E6%B3%95-doCreateBean%E6%96%B9%E6%B3%95"><span class="nav-number">2.1.</span> <span class="nav-text">获取完整对象的方法-doCreateBean方法</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%AE%9E%E4%BE%8B%E5%8C%96%E5%90%8E%E7%9A%84%E7%BC%93%E5%AD%98%E6%B7%BB%E5%8A%A0"><span class="nav-number">2.1.1.</span> <span class="nav-text">实例化后的缓存添加</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%AF%B9%E8%B1%A1%E5%B1%9E%E6%80%A7%E6%B3%A8%E5%85%A5%E7%9A%84%E6%B5%81%E7%A8%8B"><span class="nav-number">2.1.2.</span> <span class="nav-text">对象属性注入的流程</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BB%8E%E4%B8%89%E7%BA%A7%E7%BC%93%E5%AD%98%E4%B8%AD%E8%8E%B7%E5%8F%96%E4%BE%9D%E8%B5%96%E6%B3%A8%E5%85%A5%E7%9A%84%E5%8D%8A%E6%88%90%E5%93%81%E5%AF%B9%E8%B1%A1-getSingleton-%E6%96%B9%E6%B3%95"><span class="nav-number">2.2.</span> <span class="nav-text">从三级缓存中获取依赖注入的半成品对象-getSingleton 方法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%89%E7%BA%A7%E5%AD%98%E5%82%A8%E7%9A%84lambda%E8%A1%A8%E8%BE%BE%E5%BC%8F%E5%AF%B9%E5%BA%94%E7%9A%84%E7%94%9F%E6%88%90%E4%B8%8D%E5%AE%8C%E6%95%B4%E5%AF%B9%E8%B1%A1%E7%9A%84%E6%96%B9%E6%B3%95-getEarlyBeanReference%E6%96%B9%E6%B3%95"><span class="nav-number">2.3.</span> <span class="nav-text">三级存储的lambda表达式对应的生成不完整对象的方法-getEarlyBeanReference方法</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">3.</span> <span class="nav-text">总结</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%99%84%E5%BD%95Spring-%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E7%B3%BB%E5%88%97%E6%96%87%E7%AB%A0"><span class="nav-number">4.</span> <span class="nav-text">附录Spring 源码分析系列文章</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#IOC"><span class="nav-number">4.1.</span> <span class="nav-text">IOC</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#AOP"><span class="nav-number">4.2.</span> <span class="nav-text">AOP</span></a></li></ol></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="李万青"
+      src="/images/8a06cd0a8da6a6848b7a0b37b32164b7.jpeg">
+  <p class="site-author-name" itemprop="name">李万青</p>
+  <div class="site-description" itemprop="description">苦心人天不负</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">14</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/liwqtm/liwqtm.github.io" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;liwqtm&#x2F;liwqtm.github.io" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll site-overview-item animated">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/m0_51464746?type=blog" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;m0_51464746?type&#x3D;blog" rel="noopener" target="_blank">张怀猛的博客</a>
+        </li>
+    </ul>
+  </div>
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2022/03/17/Spring%20IOC-5/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/8a06cd0a8da6a6848b7a0b37b32164b7.jpeg">
+      <meta itemprop="name" content="李万青">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="茯楚博客">
+      <meta itemprop="description" content="苦心人天不负">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="IOC流程解析-循环依赖 | 茯楚博客">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          IOC流程解析-循环依赖
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2022-03-17 00:00:00" itemprop="dateCreated datePublished" datetime="2022-03-17T00:00:00+08:00">2022-03-17</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-04-28 18:12:12" itemprop="dateModified" datetime="2022-04-28T18:12:12+08:00">2022-04-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Java%E6%A1%86%E6%9E%B6/" itemprop="url" rel="index"><span itemprop="name">Java框架</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/Java%E6%A1%86%E6%9E%B6/Spring/" itemprop="url" rel="index"><span itemprop="name">Spring</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>Spring IOC 一系列文章下来，我们已经了解了整个spring IOC 核心refresh 方法的全部内容，这个方法名我是每篇文章都有提到，一定要记住。本次就聊一下IOC 的最后一个知识点：循环依赖的问题。</p>
+<h2 id="什么是循环依赖？"><a href="#什么是循环依赖？" class="headerlink" title="什么是循环依赖？"></a>什么是循环依赖？</h2><p>很多小伙伴都在各种渠道听到过“循环依赖”这个词，也应该有一定了解，但是我这里还是要重新在具体描述一下循环依赖的概念。</p>
+<p>循环依赖是指：在spring IOC 容器初始化的时候，记住是初始化，不是实例化，上篇文章<a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/15/Spring%20IOC-4/#more">IOC流程解析-实例化和初始化</a> 就已近说过了spring 对于bean 的实例化和初始化是分开的，一定要记住这里是指初始化，也就是为bean 对象属性赋值的是时候，如果目前初始化的对象A，其中有一个属性对象B，那么这里就会先去加载注册对象B，但是如果B中又有属性对象A，但是A目前还在初始化过程，这样就会形成了循环依赖。</p>
+<p>简单描述就是：A 对象加载B 对象的时候，B 对象反过来需要加载A 对象。甚至可以再加多个中间对象，比如加一个C 对象，那么这就是A 对象加载B 对象的时候，B 对象需要加载C 对象，而C 对象又需要加载A 对象。只要形成加载循环，那么就会存在循环依赖的问题。<span id="more"></span></p>
+<h2 id="Spring是如何解决循环依赖的"><a href="#Spring是如何解决循环依赖的" class="headerlink" title="Spring是如何解决循环依赖的"></a>Spring是如何解决循环依赖的</h2><p>这里就开始本次文章的重点，Spring 是如何解决循环依赖的，关于这点刚刚不是也说了嘛，循环的形成一定是初始化对象的时候，那么我们就还需要回到上篇文章说的doCreateBean 方法中去看。</p>
+<p>先说一下Spring 解决循环依赖的结论，带着结论去看会更容易一点，结论只有两点：</p>
+<ol>
+<li>解决循环依赖，需要将实例化和初始化过程分离，也就说如果是构造器注入的话，是无法解决循环依赖的</li>
+<li>利用一、二、三级缓存去解决。为什么不用一个或者两个缓存解决呢，因为一个解决不了（一级缓存是单例池，也就说这个缓存是不可避免的，只用单例池缓存是无法解决循环依赖的），两个无法做到最优。</li>
+</ol>
+<p>那么问题又来了，什么是一、二、三级缓存呢，看图。有一点需要记住，这里是BeanFactory 中。</p>
+<p><img src="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/04/25/09:46:53-image-20220425094652262.png" alt="image-20220425094652262"></p>
+<h3 id="获取完整对象的方法-doCreateBean方法"><a href="#获取完整对象的方法-doCreateBean方法" class="headerlink" title="获取完整对象的方法-doCreateBean方法"></a>获取完整对象的方法-doCreateBean方法</h3><p>doCreateBean 方法我们之前已经解析过了，下面的内容我们就直接定位具体到具体的方法调用就行，不再重复流程，有不懂的小伙伴可以看上篇文章。</p>
+<h4 id="实例化后的缓存添加"><a href="#实例化后的缓存添加" class="headerlink" title="实例化后的缓存添加"></a>实例化后的缓存添加</h4><p>直接定位到缓存添加的内容。</p>
+<p>首先这里就会获取当前对象的配置信息，然后判断是否需要添加缓存，这基本上没有都是默认配置，都能通过判断，直接调用addSingletonFactory 方法，注意这里有一个入参是我们上篇文章说的函数方法，也就是ObjecFactory 函数接口的调用，跟上篇文章说的doCreate 调用一样，真正的调用时机是由addSingletonFactory 方法内容决定的。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 7.判断是否需要提早曝光实例：单例 &amp;&amp; 允许循环依赖 &amp;&amp; 当前bean正在创建中</span></span><br><span class="line"><span class="type">boolean</span> <span class="variable">earlySingletonExposure</span> <span class="operator">=</span> (mbd.isSingleton() &amp;&amp; <span class="built_in">this</span>.allowCircularReferences &amp;&amp;</span><br><span class="line">                                  isSingletonCurrentlyInCreation(beanName));</span><br><span class="line"><span class="keyword">if</span> (earlySingletonExposure) &#123;</span><br><span class="line">  <span class="keyword">if</span> (logger.isTraceEnabled()) &#123;</span><br><span class="line">    logger.trace(<span class="string">&quot;Eagerly caching bean &#x27;&quot;</span> + beanName +</span><br><span class="line">                 <span class="string">&quot;&#x27; to allow for resolving potential circular references&quot;</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">// 8.提前曝光beanName的ObjectFactory，设置三级缓存,用于解决循环引用</span></span><br><span class="line">  <span class="comment">// xximpl implements ObjecFactory&#123;  getObject()&#123;getEarlyBeanReference(beanName, mbd, bean)&#125;  &#125;</span></span><br><span class="line">  addSingletonFactory(beanName, () -&gt; getEarlyBeanReference(beanName, mbd, bean));</span><br><span class="line">  <span class="comment">// ===&gt; 8.1 getEarlyBeanReference:</span></span><br><span class="line">  <span class="comment">//  应用后置处理器SmartInstantiationAwareBeanPostProcessor，允许返回指定bean的早期引用，若没有则直接返回bean</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>继续跟进addSingletonFactory 方法。</p>
+<p>这里就是将入参的函数方法添加到三级缓存中，然后清除一下二级缓存。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title function_">addSingletonFactory</span><span class="params">(String beanName, ObjectFactory&lt;?&gt; singletonFactory)</span> &#123;</span><br><span class="line">  Assert.notNull(singletonFactory, <span class="string">&quot;Singleton factory must not be null&quot;</span>);</span><br><span class="line">  <span class="keyword">synchronized</span> (<span class="built_in">this</span>.singletonObjects) &#123;</span><br><span class="line">    <span class="comment">// 1.如果beanName不存在于singletonObjects缓存</span></span><br><span class="line">    <span class="keyword">if</span> (!<span class="built_in">this</span>.singletonObjects.containsKey(beanName)) &#123;</span><br><span class="line">      <span class="comment">// 2.将beanName和singletonFactory注册到singletonFactories缓存(三级缓存)（beanName -&gt; 该beanName的单例工厂）</span></span><br><span class="line">      <span class="built_in">this</span>.singletonFactories.put(beanName, singletonFactory);</span><br><span class="line">      <span class="comment">// 3.移除earlySingletonObjects缓存中的beanName（beanName -&gt; beanName的早期单例对象）</span></span><br><span class="line">      <span class="built_in">this</span>.earlySingletonObjects.remove(beanName);</span><br><span class="line">      <span class="comment">// 4.将beanName注册到registeredSingletons缓存（已经注册的单例集合）</span></span><br><span class="line">      <span class="built_in">this</span>.registeredSingletons.add(beanName);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="对象属性注入的流程"><a href="#对象属性注入的流程" class="headerlink" title="对象属性注入的流程"></a>对象属性注入的流程</h4><p>还是直接定位到其初始化内容中的属性填充方法-populateBean 方法中。为了下面方便阅读理解，我们代指第一个对象为A 对象、A 中需要注入的对象为B 对象。</p>
+<p>然后我们直接找到最里层的调用resolveValueIfNecessary 方法中。这里在上篇文章就知道会判断需要注入属性的类型，然后再调用具体的赋值方法，上篇文章这后面我们就没有详细看了，现在我们定位到注入对象的判断中，跟进其resolveReference 方法中。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//  1. RuntimeBeanReference类型（ref:bean引用）</span></span><br><span class="line"><span class="keyword">if</span> (value <span class="keyword">instanceof</span> RuntimeBeanReference) &#123;</span><br><span class="line">  <span class="type">RuntimeBeanReference</span> <span class="variable">ref</span> <span class="operator">=</span> (RuntimeBeanReference) value;</span><br><span class="line">  <span class="keyword">return</span> resolveReference(argName, ref);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>跟进resolveReference 方法。</p>
+<p>这里就可以发现，对象的注入，其实还是调用beanFactory 的getBean 方法，又是跟之前一样的流程，getBean -&gt; doGetBean -&gt; createBean -&gt; doCreateBean，注意目前这个getBean 的是B 对象，而B 对象在一级缓存，也就是单例池中是没有对应实例的，所以还是会走到这里，等于就是又会回到resolveReference 方法中，本次getBean 的就是A 对象了，这样才是形成了循环依赖。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">resolvedName = String.valueOf(doEvaluate(ref.getBeanName()));</span><br><span class="line">bean = <span class="built_in">this</span>.beanFactory.getBean(resolvedName);</span><br></pre></td></tr></table></figure>
+
+<p>总结一下：对于A 对象中注入B 对象，就是A 对象初始化内容中属性注入的时候，调用getBean 获取B 对象的实例，然后注入回A 对象，也就是又调用getBean 获取A 对象的实例。</p>
+<h3 id="从三级缓存中获取依赖注入的半成品对象-getSingleton-方法"><a href="#从三级缓存中获取依赖注入的半成品对象-getSingleton-方法" class="headerlink" title="从三级缓存中获取依赖注入的半成品对象-getSingleton 方法"></a>从三级缓存中获取依赖注入的半成品对象-getSingleton 方法</h3><p>这里我们再次回到doGetBean 方法中，直接看到其第一步，从缓存中获取对象实例的方法getSingleton 方法，注意这个getBean 的是由B对象调用获取的A对象，也就是已经套了两次娃了。</p>
+<p>跟进getSingleton 方法。</p>
+<p>首先是从一级缓存中获取对象实例，如果没有其实例，那么久会走判断是否该对象真正创建中。</p>
+<p>注意前两次我们这里都没有走进，因为getBean(A) 的时候A 对象是第一次走进来，所以没有进，而A 对象调用getBean(B) 的时候，B 对象也是第一次走进来，还是没有进判断，只有这个B 对象再次调用getBean(A) 的时候，A 对象就是已经在创建中了，所以判断通过。</p>
+<p>这里判断当前Bean 是否正在被创建的依据就是，上篇文章说的doCreateBean 在被调用之前添加singletonsCurrentlyInCreation 集合。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Nullable</span></span><br><span class="line"><span class="keyword">protected</span> Object <span class="title function_">getSingleton</span><span class="params">(String beanName, <span class="type">boolean</span> allowEarlyReference)</span> &#123;</span><br><span class="line">  <span class="comment">// Quick check for existing instance without full singleton lock</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// 1.从单例对象缓存（1级缓存）中获取beanName对应的单例对象</span></span><br><span class="line">  <span class="type">Object</span> <span class="variable">singletonObject</span> <span class="operator">=</span> <span class="built_in">this</span>.singletonObjects.get(beanName);</span><br><span class="line">  <span class="comment">// 2.如果单例对象缓存（1级缓存）中没有，并且该beanName对应的单例bean正在创建中</span></span><br><span class="line">  <span class="keyword">if</span> (singletonObject == <span class="literal">null</span> &amp;&amp; isSingletonCurrentlyInCreation(beanName)) &#123;</span><br></pre></td></tr></table></figure>
+
+<p>然后继续看下代码，这里会再次判断单例对象为空，并该对象允许循环引用，也就是支持循环依赖的解决，这个不配置的情况下，都是true。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 4.如果在早期单例对象缓存中（二级缓存）也没有，并且允许创建早期单例对象引用</span></span><br><span class="line"><span class="keyword">if</span> (singletonObject == <span class="literal">null</span> &amp;&amp; allowEarlyReference) &#123;</span><br><span class="line">  <span class="keyword">synchronized</span> (<span class="built_in">this</span>.singletonObjects) &#123;</span><br></pre></td></tr></table></figure>
+
+<p>继续，再从一级缓存获取，如果没有，再去二级缓存中获取，这里相当于一个重试机制，都没有的情况下，才会去获取三级缓存中存储的函数方法（这个所谓的函数方法，一般情况下都称之为：Lambda表达式）</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">synchronized</span> (<span class="built_in">this</span>.singletonObjects) &#123;</span><br><span class="line">  <span class="comment">// Consistent creation of early reference within full singleton lock</span></span><br><span class="line">  <span class="comment">// 6.从单例工厂缓存中（一级缓存）获取beanName的单例工厂</span></span><br><span class="line">  singletonObject = <span class="built_in">this</span>.singletonObjects.get(beanName);</span><br><span class="line">  <span class="keyword">if</span> (singletonObject == <span class="literal">null</span>) &#123;</span><br><span class="line">    <span class="comment">// 再次从二级缓存中获取，重复校验</span></span><br><span class="line">    singletonObject = <span class="built_in">this</span>.earlySingletonObjects.get(beanName);</span><br><span class="line">    <span class="comment">// 为null</span></span><br><span class="line">    <span class="keyword">if</span> (singletonObject == <span class="literal">null</span>) &#123;</span><br><span class="line">      <span class="comment">// 6.再从单例工厂缓存中（三级缓存）获取beanName的单例工厂</span></span><br><span class="line">      ObjectFactory&lt;?&gt; singletonFactory = <span class="built_in">this</span>.singletonFactories.get(beanName);</span><br></pre></td></tr></table></figure>
+
+<p>当获取到Lambda 表达式后，就是具体getObject 调用了，然后将返回的实例对象存入二级缓存，注意这里是二级缓存，因为当前对象还是不完整对象，不能放入一级缓存中，并将三级缓存储的lambda 表达式移除。最后还要将得到的对象返回，再次重申，这里得到的是不完整的A 对象。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (singletonFactory != <span class="literal">null</span>) &#123;</span><br><span class="line">  <span class="comment">// 7.如果存在单例对象工厂，则通过工厂创建一个单例对象</span></span><br><span class="line">  singletonObject = singletonFactory.getObject();</span><br><span class="line">  <span class="comment">// 8.将通过单例对象工厂创建的单例对象，放到早期单例对象缓存中</span></span><br><span class="line">  <span class="built_in">this</span>.earlySingletonObjects.put(beanName, singletonObject);</span><br><span class="line">  <span class="comment">// 9.移除该beanName对应的单例对象工厂，因为该单例工厂已经创建了一个实例对象，并且放到earlySingletonObjects缓存了，</span></span><br><span class="line">  <span class="comment">// 因此，后续获取beanName的单例对象，可以通过earlySingletonObjects缓存拿到，不需要在用到该单例工厂</span></span><br><span class="line">  <span class="built_in">this</span>.singletonFactories.remove(beanName);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">return</span> singletonObject;</span><br></pre></td></tr></table></figure>
+
+<h3 id="三级存储的lambda表达式对应的生成不完整对象的方法-getEarlyBeanReference方法"><a href="#三级存储的lambda表达式对应的生成不完整对象的方法-getEarlyBeanReference方法" class="headerlink" title="三级存储的lambda表达式对应的生成不完整对象的方法-getEarlyBeanReference方法"></a>三级存储的lambda表达式对应的生成不完整对象的方法-getEarlyBeanReference方法</h3><p>这里还是得看上面节点：”实例化后的缓存添加“的内容，找打lambda 表达式对应的方法getEarlyBeanReference 方法。</p>
+<p>跟进该方法。</p>
+<p>这段代码的内容，可以说是非常的简单，因为在当前对象没有代理的情况下，是不进入第一个判断的，也就是说这里返回的，就是当时存储的A 对象，就是那个刚刚实例化完成后，没有经过初始化的A 对象。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">protected</span> Object <span class="title function_">getEarlyBeanReference</span><span class="params">(String beanName, RootBeanDefinition mbd, Object bean)</span> &#123;</span><br><span class="line">  <span class="type">Object</span> <span class="variable">exposedObject</span> <span class="operator">=</span> bean;</span><br><span class="line">  <span class="comment">// 1.如果bean不为空 &amp;&amp; mbd不是合成 &amp;&amp; 存在InstantiationAwareBeanPostProcessors</span></span><br><span class="line">  <span class="keyword">if</span> (!mbd.isSynthetic() &amp;&amp; hasInstantiationAwareBeanPostProcessors()) &#123;</span><br><span class="line">    <span class="keyword">for</span> (BeanPostProcessor bp : getBeanPostProcessors()) &#123;</span><br><span class="line">      <span class="comment">// 2.应用所有SmartInstantiationAwareBeanPostProcessor，调用getEarlyBeanReference方法</span></span><br><span class="line">      <span class="keyword">if</span> (bp <span class="keyword">instanceof</span> SmartInstantiationAwareBeanPostProcessor) &#123;</span><br><span class="line">        <span class="type">SmartInstantiationAwareBeanPostProcessor</span> <span class="variable">ibp</span> <span class="operator">=</span> (SmartInstantiationAwareBeanPostProcessor) bp;</span><br><span class="line">        <span class="comment">// 3.允许SmartInstantiationAwareBeanPostProcessor返回指定bean的早期引用</span></span><br><span class="line">        exposedObject = ibp.getEarlyBeanReference(exposedObject, beanName);</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="comment">// 4.返回要作为bean引用公开的对象，如果没有SmartInstantiationAwareBeanPostProcessor修改，则返回的是入参的bean对象本身</span></span><br><span class="line">  <span class="keyword">return</span> exposedObject;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这样返回后就能在B 对象调用的getBean(A) 的时候，将仅仅只实例化的A 注入到B 对象当中，这个B 对象就能初始化完成了，同时也会返回到A 对象调用的getBean(B) 的内容中了，这样A 对象也就能初始化完成了。</p>
+<p>这里有小伙伴就要问了，那B 对象中的A 对象属性不就是只有仅仅实例化的A 对象嘛，不然这里A 对象是放入了单例池当中，当A 注册单例池完成之后，B 对象中的A 对象属性是指向了完成后的A 对象，而不是指向实例化的A 对象。</p>
+<p>还有小伙伴说二级缓存没有用，三级缓存就能搞定，是三级缓存是可以搞定，但是想一想，如果B 对象注入A 对象完成之后，再次注入一个C 对象，而C 对象又要注入A 对象，这样是不是就不用再走三级缓存了，而且目前我们是没有走lambda 表达式中的代理模式的，如果有的话，就是又会生成一个代理对象，所以三级缓存中存储的相当于是一个工厂，二级缓存存储的才是不完整对象。</p>
+<p>就此Spring 就解决了循环依赖的问题。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>还是那句话Spring 解决循环依赖，就是靠的实例化和初始化分离，以及一、二、三级缓存，如果只存在两个缓存也能解决问题，但是会非常的复杂，又是判断对象是否是完整对象，还有判断代理对象重复加载之类的，三个缓存同时存在才是最优的解决方案。</p>
+<p>就此Spring IOC 的内容算是已经全部完结了，主要就是核心方法的理解，一定要自己跟代码，不跟代码别人说再多，该不会还是不会。</p>
+<p>最后祝各位小伙伴入坑快乐。</p>
+<h2 id="附录Spring-源码分析系列文章"><a href="#附录Spring-源码分析系列文章" class="headerlink" title="附录Spring 源码分析系列文章"></a>附录Spring 源码分析系列文章</h2><h3 id="IOC"><a href="#IOC" class="headerlink" title="IOC"></a>IOC</h3><table>
+<thead>
+<tr>
+<th align="left">时间</th>
+<th>文章</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">2022-03-09</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/09/Spring%20IOC-1/#more">Spring的基本概念和IOC流程的简述</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-11</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/11/Spring%20IOC-2/#more">IOC流程解析-BeanFactory的创建</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-14</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/14/Spring%20IOC-3/#more">IOC流程解析-BeanFactoyPostProcessor和BeanPostProcessor</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-15</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/15/Spring%20IOC-4/#more">IOC流程解析-实例化和初始化</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-17</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/17/Spring%20IOC-5/#more">IOC流程解析-循环依赖</a></td>
+</tr>
+</tbody></table>
+<h3 id="AOP"><a href="#AOP" class="headerlink" title="AOP"></a>AOP</h3><table>
+<thead>
+<tr>
+<th align="left">时间</th>
+<th>文章</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">2022-03-19</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/09/Spring%20IOC-1/#more">Spring的基本概念和IOC流程的简述</a></td>
+</tr>
+<tr>
+<td align="left">2022-03-20</td>
+<td><a target="_blank" rel="noopener" href="https://liwqtm.github.io/2022/03/20/Spring%20AOP-2/#more">AOP流程源码分析-请求调用全流程</a></td>
+</tr>
+</tbody></table>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E6%A1%86%E6%9E%B6/" rel="tag"># 框架</a>
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/Spring/" rel="tag"># Spring</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2022/03/15/Spring%20IOC-4/" rel="prev" title="IOC流程解析-实例化和初始化">
+                  <i class="fa fa-chevron-left"></i> IOC流程解析-实例化和初始化
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2022/03/19/Spring%20AOP-1/" rel="next" title="AOP流程源码分析-配置信息解析和代理对象创建">
+                  AOP流程源码分析-配置信息解析和代理对象创建 <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">李万青</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/next-boot.js"></script>
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+</body>
+</html>
