@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 6.2.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css" integrity="sha256-DfWjNxDkM94fVBWx1H5BMMp0Zq7luBlV8QRcSES7s+0=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"example.com","root":"/","images":"/images","scheme":"Gemini","darkmode":true,"version":"8.11.1","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12},"copycode":{"enable":false,"style":null},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="keycloak 目前算是完全空白的一开内容，后续的一系列文章都是来整理学习这块内容的，目前本篇要做的就是了解keycloak 是什么？用于做什么？然后怎么配置启动？怎么集成到项目中？">
+<meta property="og:type" content="article">
+<meta property="og:title" content="keycloak概述及启动与项目搭建">
+<meta property="og:url" content="http://example.com/2022/06/22/keycloak-1/index.html">
+<meta property="og:site_name" content="茯楚博客">
+<meta property="og:description" content="keycloak 目前算是完全空白的一开内容，后续的一系列文章都是来整理学习这块内容的，目前本篇要做的就是了解keycloak 是什么？用于做什么？然后怎么配置启动？怎么集成到项目中？">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/06/22/15:29:45-image-20220622152943252.png">
+<meta property="og:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/06/22/17:45:54-image-20220622174552657.png">
+<meta property="og:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/06/22/17:46:37-image-20220622174636280.png">
+<meta property="og:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/06/22/17:48:51-image-20220622174850824.png">
+<meta property="og:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/06/23/11:54:18-image-20220623115415840.png">
+<meta property="og:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/06/23/11:56:41-image-20220623115640735.png">
+<meta property="og:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/06/23/11:57:15-image-20220623115714571.png">
+<meta property="og:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/06/23/11:59:51-image-20220623115950988.png">
+<meta property="og:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/06/23/12:06:16-image-20220623120614939.png">
+<meta property="og:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/06/23/12:14:10-image-20220623121409779.png">
+<meta property="article:published_time" content="2022-06-22T06:36:23.000Z">
+<meta property="article:modified_time" content="2022-07-13T10:46:08.050Z">
+<meta property="article:author" content="李万青">
+<meta property="article:tag" content="-keycloak">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/06/22/15:29:45-image-20220622152943252.png">
+
+
+<link rel="canonical" href="http://example.com/2022/06/22/keycloak-1/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://example.com/2022/06/22/keycloak-1/","path":"2022/06/22/keycloak-1/","title":"keycloak概述及启动与项目搭建"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>keycloak概述及启动与项目搭建 | 茯楚博客</title>
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">茯楚博客</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">记录整理技术文章</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#keycloak%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E8%BF%B0"><span class="nav-number">1.</span> <span class="nav-text">keycloak的基本概述</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#keycloak%E5%90%84%E4%B8%AA%E7%BB%84%E4%BB%B6%E5%8F%8A%E7%89%B9%E6%80%A7"><span class="nav-number">1.1.</span> <span class="nav-text">keycloak各个组件及特性</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#keycloak%E7%9A%84%E4%BC%98%E7%82%B9%E5%8F%8A%E4%B8%8D%E8%B6%B3"><span class="nav-number">1.2.</span> <span class="nav-text">keycloak的优点及不足</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#keycloak%E7%9A%84%E6%90%AD%E5%BB%BA%E5%92%8C%E4%BD%BF%E7%94%A8"><span class="nav-number">2.</span> <span class="nav-text">keycloak的搭建和使用</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#service%E7%AB%AF%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%90%AD%E5%BB%BA"><span class="nav-number">2.1.</span> <span class="nav-text">service端的启动和搭建</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#client%E7%AB%AF%E7%9A%84%E5%90%AF%E5%8A%A8%E5%92%8C%E6%90%AD%E5%BB%BA"><span class="nav-number">2.2.</span> <span class="nav-text">client端的启动和搭建</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">3.</span> <span class="nav-text">总结</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="李万青"
+      src="/images/8a06cd0a8da6a6848b7a0b37b32164b7.jpeg">
+  <p class="site-author-name" itemprop="name">李万青</p>
+  <div class="site-description" itemprop="description">苦心人天不负</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">14</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/liwqtm/liwqtm.github.io" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;liwqtm&#x2F;liwqtm.github.io" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:Lwq1006317864@outlook.com" title="E-Mail → mailto:Lwq1006317864@outlook.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://blog.csdn.net/qq_39339965?type=blog" title="我的CSDN → https:&#x2F;&#x2F;blog.csdn.net&#x2F;qq_39339965?type&#x3D;blog" rel="noopener" target="_blank"><i class="fab fa-superpowers fa-fw"></i>我的CSDN</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll site-overview-item animated">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/m0_51464746?type=blog" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;m0_51464746?type&#x3D;blog" rel="noopener" target="_blank">张怀猛的博客</a>
+        </li>
+    </ul>
+  </div>
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2022/06/22/keycloak-1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/8a06cd0a8da6a6848b7a0b37b32164b7.jpeg">
+      <meta itemprop="name" content="李万青">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="茯楚博客">
+      <meta itemprop="description" content="苦心人天不负">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="keycloak概述及启动与项目搭建 | 茯楚博客">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          keycloak概述及启动与项目搭建
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2022-06-22 14:36:23" itemprop="dateCreated datePublished" datetime="2022-06-22T14:36:23+08:00">2022-06-22</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-07-13 18:46:08" itemprop="dateModified" datetime="2022-07-13T18:46:08+08:00">2022-07-13</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/keycloak/" itemprop="url" rel="index"><span itemprop="name">-keycloak</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>keycloak 目前算是完全空白的一开内容，后续的一系列文章都是来整理学习这块内容的，目前本篇要做的就是了解keycloak 是什么？用于做什么？然后怎么配置启动？怎么集成到项目中？<span id="more"></span></p>
+<h2 id="keycloak的基本概述"><a href="#keycloak的基本概述" class="headerlink" title="keycloak的基本概述"></a>keycloak的基本概述</h2><p>从目前掌握的资料来看keycloak 是一种针对应用程序和服务访问管理的解决方案，它支持单点登陆，因此服务可以通过OpenID Connect、OAuth 2.0 等协议对接Keycloak。</p>
+<p>我目前感觉下来keycloak 就是提供了一套管理用户信息的中间系统，其余的各个系统都可以通过登陆这个系统进行账户验证，而且它支持单点登录，也就是说登陆一下搞定全部应用。</p>
+<h3 id="keycloak各个组件及特性"><a href="#keycloak各个组件及特性" class="headerlink" title="keycloak各个组件及特性"></a>keycloak各个组件及特性</h3><p>关于keycloak 的特性其实在百度上面就能查到很多，我这里就是简单的汇总一下。</p>
+<ol>
+<li>SSO 单点登陆：keycloak 能够完全支持单点登陆和单点登出；</li>
+<li>管理控制台：提供了基础web 的GUI，可以按照需求配置各种实例；</li>
+<li>用户身份和访问：它可以作为一个单独的用于身份和访问管理器，以便于我们创建用户数据库，自定义角色和用户组。也就说可以实现各个不同系统或者模块的用户身份信息存储及验证；</li>
+<li>外部身份标识源的同步：这个我理解就是可以用外部的用户数据库，比如：微信之类的用户，只要配置好对应的api 接口对接就能获取到外部数据；</li>
+<li>身份代理：它还可以作为用户和一些外部身份提供者之间的代理。可以通过keycloak 的管理面板，俩编辑两侧对应关系的列表；</li>
+<li>社交身份提供者：这个应该是说keycloak 本身也提供了一些支持的社交身份，可以通过管理面板来进行手动配置；</li>
+<li>页面定制：这里就是说可以用自己定义管理面板的风格，定制 JS 脚本之类的。</li>
+</ol>
+<p>上述基本就是keycloak 的特性，总结就是方便管理用户数据，有自己的用户数据库，也可以外接外部用户数据库，有一套自己的页面管理面板来管理用户信息，这套管理面板样式可以自己定义，同时最主要的单点登录。</p>
+<h3 id="keycloak的优点及不足"><a href="#keycloak的优点及不足" class="headerlink" title="keycloak的优点及不足"></a>keycloak的优点及不足</h3><p>首先keycloak 的优点，最主要的可以白嫖，不要钱，其它的比如AuthO 或者 Okta 之类的就要收费。其余的优点网上一样有很多，我这边还是大体写一下，更加详细的可以查一查。</p>
+<ol>
+<li>支持三种不用的身份验证协议；</li>
+<li>有强大社区支持，能够能方便快捷的解决一些遇到的难题；</li>
+<li>支持社交账号登陆；</li>
+<li>web可以进行修改，自定义个人化管理面板；</li>
+<li>SSO 可以支持用户同时访问多项服务。</li>
+</ol>
+<p>那有优点，就有不足，其实也就是一些常见问题。</p>
+<ol>
+<li>如果某个应用程序只有单个客户用到keycloak，那么他将无法获益SSO 的整体规模性优势；</li>
+<li>keycloak 原则上可以配置成一个纯用户数据库，但是它会附带各种特殊用途的表，因此还不如直接使用专有的用户关系型数据库；</li>
+<li>keycloak 也因为是免费开源的项目，所以社区中没有固定开发者、及其发展路线图，同时意味也无法为质量保证的企业级服务提供支持和响应水平。</li>
+</ol>
+<p>总的来说，优点很明显，缺点其余的类似技术也存在，没有说十全十美的，但是项目开发中使用这个还是蛮方便的，尤其是目前的微服务架构，用这个做登陆中间系统可行。</p>
+<h2 id="keycloak的搭建和使用"><a href="#keycloak的搭建和使用" class="headerlink" title="keycloak的搭建和使用"></a>keycloak的搭建和使用</h2><p>这块目前我是还没有正式搭建过，下面基本上就是我目前搭建的全流程，一般情况下跟着我的步骤走是不会出现问题的，要是有问题还是问度娘吧，新技术没看源码的情况下，先看怎么用吧，过段时间再源码分析。（这里也可以参考：<a target="_blank" rel="noopener" href="https://blog.csdn.net/ZN_nick_NZ/article/details/124139700">keycloak的搭建教程</a>）</p>
+<h3 id="service端的启动和搭建"><a href="#service端的启动和搭建" class="headerlink" title="service端的启动和搭建"></a>service端的启动和搭建</h3><ol>
+<li><p>首先确定jdk 版本要在11之上；</p>
+</li>
+<li><p>然后去<a target="_blank" rel="noopener" href="https://www.keycloak.org/documentation.html">官网</a>下载压缩包，可以用我这边的<a target="_blank" rel="noopener" href="https://download.csdn.net/download/qq_39339965/85736254">keycloak压缩包</a><img src="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/06/22/15:29:45-image-20220622152943252.png" alt="image-20220622152943252"></p>
+</li>
+<li><p>将下载的安装包解压并重命名为keycloak。</p>
+</li>
+<li><p>修改keycloak相关配置，也可以保持默认配置，直接操作第五步。打开conf文件夹下的keycloak.conf文件修改keycloak的相关配置。更多的配置参考<a target="_blank" rel="noopener" href="https://www.keycloak.org/server/all-config">此处</a>。</p>
+ <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">KC_HTTP_PORT=8090  #修改端口号为8090</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>打开命令行工具，定位到keycloak目录下。运行以下命令。（注意这是管理员权限运行）</p>
+ <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bin/kc.bat start-dev</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>访问 <a target="_blank" rel="noopener" href="http://localhost:8090/">http://localhost:8090</a> (按照你所配置的端口，如果没有配置的话，默认为8080)。首次登录会让你创建管理员。<img src="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/06/22/17:45:54-image-20220622174552657.png" alt="image-20220622174552657" style="zoom: 33%;" /></p>
+</li>
+<li><p>使用第6步创建的管理员，登录Administration Console 。<img src="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/06/22/17:46:37-image-20220622174636280.png" alt="image-20220622174636280" style="zoom: 67%;" /></p>
+</li>
+<li><p>然后可以进入管理面板，点击登陆，然后选择主题，开启国际化，选择中文，然后退出登录再次进入就是中文模式。<img src="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/06/22/17:48:51-image-20220622174850824.png" alt="image-20220622174850824"></p>
+</li>
+</ol>
+<p>这样keycloak 的service 端的启动基本完成了，后面关于client 端的搭建，我这里使用的就是springboot，继续。</p>
+<h3 id="client端的启动和搭建"><a href="#client端的启动和搭建" class="headerlink" title="client端的启动和搭建"></a>client端的启动和搭建</h3><p>我这里使用的是springboot项目来搭建，但是在项目搭建之前，还需要在keycloak 的管理面板上面做一些配置工作具体如下：</p>
+<ol>
+<li>首先登陆keycloak，进入管理面板后，要先添加域；<img src="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/06/23/11:54:18-image-20220623115415840.png" alt="image-20220623115415840" style="zoom: 67%;" /></li>
+<li>然后新建一个客户端；<img src="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/06/23/11:56:41-image-20220623115640735.png" alt="image-20220623115640735">    <img src="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/06/23/11:57:15-image-20220623115714571.png" alt="image-20220623115714571" style="zoom:67%;" />   <img src="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/06/23/11:59:51-image-20220623115950988.png" alt="image-20220623115950988" style="zoom:50%;" />  这里最重要的是有效的重定向URL，至于访问方式可以修改为其它，设置会更安全</li>
+<li>创建好客户端之后，再为其增加角色，我这里添加了一个user、一个admain；<img src="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/06/23/12:06:16-image-20220623120614939.png" alt="image-20220623120614939"></li>
+<li>再操作用户添加，首先点击添加用户，然后在完成用户名添加保存，再设置密码，最后也最重要的角色映射，选择客户端角色为刚刚添加的客户端，再为不同用户分配不同角色。<img src="https://liwqtm-blog.oss-cn-shanghai.aliyuncs.com/blog/2022/06/23/12:14:10-image-20220623121409779.png" alt="image-20220623121409779"></li>
+</ol>
+<p>这样就完成了keycloak 的基本配置，如果客户端创建的时候选择的访问类型不是public，而是confidential 那么就还需在客户端设置凭证，这样项目才能进行访问该客户端。</p>
+<p>那么下面就是对于springboot项目的搭建配置，其实还可以先在官网下载快速入门的<a target="_blank" rel="noopener" href="https://github.com/keycloak/keycloak-quickstarts/archive/latest.zip">demo</a>，这里面就含有springboot的项目。</p>
+<ol>
+<li><p>创建一个springboot 的基本项目，我这里用的是idea，具体的就不演示了，这个比较简单；</p>
+</li>
+<li><p>pom.xml 展示，注意keycloak 的版本不要错，我这里是18版本，要一一对相应；</p>
+ <figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">dependencies</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">dependency</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">groupId</span>&gt;</span>org.keycloak<span class="tag">&lt;/<span class="name">groupId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">artifactId</span>&gt;</span>keycloak-spring-boot-starter<span class="tag">&lt;/<span class="name">artifactId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">version</span>&gt;</span>18.0.0<span class="tag">&lt;/<span class="name">version</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;/<span class="name">dependency</span>&gt;</span></span><br><span class="line"></span><br><span class="line">  <span class="tag">&lt;<span class="name">dependency</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">groupId</span>&gt;</span>org.keycloak<span class="tag">&lt;/<span class="name">groupId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">artifactId</span>&gt;</span>keycloak-spring-boot-adapter<span class="tag">&lt;/<span class="name">artifactId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">version</span>&gt;</span>18.0.0<span class="tag">&lt;/<span class="name">version</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;/<span class="name">dependency</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">dependencies</span>&gt;</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>application.yml 展示；</p>
+ <figure class="highlight yml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">server:</span></span><br><span class="line">  <span class="attr">port:</span> <span class="number">8082</span></span><br><span class="line"></span><br><span class="line"><span class="attr">keycloak:</span></span><br><span class="line">  <span class="attr">realm:</span> <span class="string">keycloak-demo</span></span><br><span class="line">  <span class="attr">auth-server-url:</span> <span class="string">http://localhost:8080</span></span><br><span class="line">  <span class="attr">ssl-required:</span> <span class="string">external</span></span><br><span class="line">  <span class="attr">resource:</span> <span class="string">boot-demo</span></span><br><span class="line">  <span class="attr">credentials:</span></span><br><span class="line">    <span class="attr">secret:</span> <span class="string">6tjUHFcVraOHv3vqaes6J3kcYZxrwSSU</span></span><br><span class="line">  <span class="attr">use-resource-role-mappings:</span> <span class="literal">true</span></span><br><span class="line">  <span class="attr">security-constraints:</span></span><br><span class="line">    <span class="bullet">-</span> <span class="attr">authRoles:</span></span><br><span class="line">        <span class="bullet">-</span> <span class="string">user</span></span><br><span class="line">      <span class="attr">securityCollections:</span></span><br><span class="line">        <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">Logged</span></span><br><span class="line">          <span class="attr">patterns:</span></span><br><span class="line">            <span class="bullet">-</span> <span class="string">/user/*</span></span><br><span class="line">    <span class="bullet">-</span> <span class="attr">authRoles:</span></span><br><span class="line">        <span class="bullet">-</span> <span class="string">admain</span></span><br><span class="line">      <span class="attr">securityCollections:</span></span><br><span class="line">        <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">Admin</span> <span class="string">resources</span></span><br><span class="line">          <span class="attr">patterns:</span></span><br><span class="line">            <span class="bullet">-</span> <span class="string">/admin/*</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>测试端演示。</p>
+ <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * <span class="doctag">@author</span> &lt;a href=&quot;mailto:psilva@redhat.com&quot;&gt;Pedro Igor&lt;/a&gt;</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="meta">@RestController</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">ApplicationController</span> &#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@RequestMapping(value = &quot;/user/a&quot;)</span></span><br><span class="line">    <span class="keyword">public</span> String <span class="title function_">handleResourceA</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="string">&quot;user权限访问&quot;</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@RequestMapping(value = &quot;/a&quot;)</span></span><br><span class="line">    <span class="keyword">public</span> String <span class="title function_">handleResourceB</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="string">&quot;没有权限访问&quot;</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@RequestMapping(value = &quot;/admain/a&quot;)</span></span><br><span class="line">    <span class="keyword">public</span> String <span class="title function_">handlePremiumResource</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="string">&quot;admain权限访问a&quot;</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@RequestMapping(value = &quot;/admain/b&quot;)</span></span><br><span class="line">    <span class="keyword">public</span> String <span class="title function_">handleAdminResource</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="string">&quot;admain权限访问b&quot;</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+</ol>
+<p>这样的配置完成之后基本就将一个简单client端启动完成了，至于后面的权限粒度管理，单点登出，服务发布等之后再讲，本篇内容就是简单的了解使用keycloak。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>keycloak 简单来说就是对用户数据库的管理，方便于多系统甚至外部系统来登陆注册等。本篇内容还是比较简单的，keycloak 的数据库配置，外部数据库对接，单点登陆，权限粒度管理等等后面再慢慢说。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/keycloak/" rel="tag"># -keycloak</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2022/04/27/JDK-2/" rel="prev" title="HsahMap的面试详解及源码分析">
+                  <i class="fa fa-chevron-left"></i> HsahMap的面试详解及源码分析
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2022/06/23/keycloak-2/" rel="next" title="keycloak">
+                  keycloak <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">李万青</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/next-boot.js"></script>
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+</body>
+</html>
