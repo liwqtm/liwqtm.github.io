@@ -816,7 +816,7 @@
         <i class="far fa-calendar-check"></i>
       </span>
       <span class="post-meta-item-text">更新于</span>
-      <time title="修改时间：2023-03-18 15:24:48" itemprop="dateModified" datetime="2023-03-18T15:24:48+08:00">2023-03-18</time>
+      <time title="修改时间：2023-03-18 15:29:19" itemprop="dateModified" datetime="2023-03-18T15:29:19+08:00">2023-03-18</time>
     </span>
     <span class="post-meta-item">
       <span class="post-meta-item-icon">
@@ -842,110 +842,15 @@
     
     
     <div class="post-body" itemprop="articleBody">
-          <p>时间许久再次捡起博客，新的一年开始学习新的内容，没什么好说的，还是得卷，本篇主要是总结最近一段时间在学习的docker 命令，后续在总结阿里云服务器的购买和使用流程，以及docker 的安装流程。</p>
-<h2 id="Docker-的常用命令"><a href="#Docker-的常用命令" class="headerlink" title="Docker 的常用命令"></a>Docker 的常用命令</h2><h3 id="基本命令"><a href="#基本命令" class="headerlink" title="基本命令"></a>基本命令</h3><p><strong>docker 启动</strong>：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">systemctl start docker</span><br></pre></td></tr></table></figure>
-
-<p><strong>docker 关闭</strong>：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">systemctl stop docker</span><br></pre></td></tr></table></figure>
-
-<p><strong>docker 重启</strong>：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">systemctl restart docker</span><br></pre></td></tr></table></figure>
-
-<p><strong>docker 查看运行状态</strong>：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">systemctl status docker</span><br></pre></td></tr></table></figure>
-
-<p><strong>docker 查看版本号</strong>：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker version</span><br></pre></td></tr></table></figure>
-
-<p><strong>docker 查看所有本地镜像</strong>：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker images</span><br></pre></td></tr></table></figure>
-
-<p><strong>docker 删除本地镜像</strong>：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker rmi -f 镜像名/镜像ID</span><br></pre></td></tr></table></figure>
-
-<p>解析：如果是多个镜像的话，跟在镜像名&#x2F;镜像ID之后用空格间隔。</p>
-<p><strong>docker 删除运行状态的容器</strong>：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker rm -f 镜像名/镜像ID</span><br></pre></td></tr></table></figure>
-
-<p>解析：注意这里是删除运行的容器，不是本地下载的镜像，这里只是停止运行，并删除进程。</p>
-<ul>
-<li>rm：即是删除。</li>
-<li>-f：如果不加的话，就是删除停止状态的镜像容器。</li>
-<li>镜像名&#x2F;镜像ID：这里可以多个，用空格间隔开</li>
-</ul>
-<p><strong>docker 运行容器停止</strong>：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker stop 容器名/容器ID</span><br></pre></td></tr></table></figure>
-
-<p><strong>docker 停止容器启动</strong>：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker start 容器ID/容器名</span><br></pre></td></tr></table></figure>
-
-<p><strong>docker 容器重启</strong>：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker restart 容器ID/容器名</span><br></pre></td></tr></table></figure>
-
-<p><strong>docker 查看容器日志</strong>：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker logs -f 容器ID/容器名</span><br></pre></td></tr></table></figure>
-
-<p>解析：可以-f 后面再加一个”–tail&#x3D;” 这样就是指定从结尾的行数。</p>
-<p><strong>docker 查看正在运行的容器</strong>：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker ps</span><br></pre></td></tr></table></figure>
-
-<p>解析：这个命令只能查看正在运行的容器，不能查看停止了，但是没有删除的容器，可以在后面加上-a 就能查询所有没有删除的容器</p>
-<p><strong>登录容器</strong>：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker exec -ti 容器ID/容器名称 /bin/bash</span><br></pre></td></tr></table></figure>
-
-<p><strong>查看容器的volume 日志目录</strong>：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker volume ls</span><br></pre></td></tr></table></figure>
-
-<p><strong>清理容器的volume 日志目录</strong>：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker volume rm 日志目录名称</span><br></pre></td></tr></table></figure>
-
-<p>解析：删除的时候，如果有容器引用了日志，是不允许删除的</p>
-<ul>
-<li>prune：将rm 换成prune 是可以清理所有，容器已经删除了的日志文件</li>
-</ul>
-<h3 id="常用容器命令"><a href="#常用容器命令" class="headerlink" title="常用容器命令"></a>常用容器命令</h3><p><strong>mysql 的镜像拉取</strong>：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker pull mysql:5.7.38</span><br></pre></td></tr></table></figure>
-
-<p>解析：可以先去<a target="_blank" rel="noopener" href="https://hub.docker.com/">docker 镜像官网</a> 查询MySQL 的所有镜像版本，同时还有一些使用方法，找到具体的版本可以直接复制对应的命令。</p>
-<ul>
-<li>pull：去拉取远程镜像。</li>
-<li>mysql:5.7.38：指定mysql 的镜像，如果没有:5.7.38 执行版本的话，就直接拉去mysql 镜像仓库的最新版本。</li>
-</ul>
-<p><strong>mysql 的启动运行</strong>：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker run -d -p 3306:3306 -v /tmp/etc/mysql:/etc/mysql/mysql.conf.d/ -v /tmp/data/mysql:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=Tm980327@lwq --name mysql mysql:5.7.38</span><br></pre></td></tr></table></figure>
-
-<p>解析：</p>
-<ul>
-<li>run：启动的开始，如果本地存在mysql 的镜像则直接启动，反之则去远程拉取镜像后启动。</li>
-<li>-d：代表后台启动，如果不加的话，就是前端启动，前端启动就意味着不能结束当前。</li>
-<li>-p：将docker 的端口映射到服务器的端口，进行端口暴露，前者是宿主机的，后者docker的。（如果是阿里云服务器的话，要注意添加安全组）</li>
-<li>-v：用于日志绑定映射，还有配置挂载，上面的内容中有两段，第一段是：将自己创建的宿主机上的mysql.conf文件，挂载到docker 容器中的mysql.conf.d 地址上，第二段是：docker 容器中的MySQL 日志文件，映射到宿主机的日志地址。映射和挂载方式就是，宿主机的地址:容器地址</li>
-<li>-e：用于指定MySQL 的本身一些属性执行，比如：MYSQL_ROOT_PASSWORD 可以指定登录密码。</li>
-<li>–name：用于指定镜像启动容器的名字。</li>
-<li>mysql:5.7.38：最后的是启动的镜像版本，不设置则启动MySQL 最新的镜像。</li>
-</ul>
-<p><strong>nacos 的镜像拉取</strong>：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker pull nacos/nacos-server:v2.2.0</span><br></pre></td></tr></table></figure>
-
-<p>解析：跟上面的mysql 拉取是一样的，只是在docker 文档查询的时候，换成nacos 就行了。</p>
-<p><strong>nacos 的启动运行</strong>：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker run -d -p 8849:8849 --name nacos_two -e MODE=standalone -e NACOS_APPLICATION_PORT=8849 nacos/nacos-server:v2.2.0</span><br></pre></td></tr></table></figure>
-
-<p>解析：跟上面的mysql 启动是一样的，就只有一定的区别</p>
-<ul>
-<li>-e：还是用于加载nacos 本身的一些配置环境变量，如上面的MODE，指定启动模式，standalone 代表的是单例模式。还有NACOS_APPLICATION_PORT 指定端口，如果不指定的话，默认是8848，这里是指定了8849。</li>
-</ul>
-<h3 id="Ubuntu-基本命令"><a href="#Ubuntu-基本命令" class="headerlink" title="Ubuntu 基本命令"></a>Ubuntu 基本命令</h3><p><strong>进入文件编辑器</strong>：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">iv 文件名</span><br></pre></td></tr></table></figure>
-
-<p>解析：</p>
-<ul>
-<li>进入编辑器后，点击i，表示进入编辑。</li>
-<li>点击Esc，退出命令编辑模式。</li>
-<li>点击:，可以进入编辑器命令模式，然后可输入w，保存文件；q，退出编辑器；q!，退出编辑器，且不保存；wq，退出编辑器，且保存文件。</li>
-</ul>
-
+          <p>时间许久再次捡起博客，新的一年开始学习新的内容，没什么好说的，还是得卷，本篇主要是总结最近一段时间在学习的docker 命令，后续在总结阿里云服务器的购买和使用流程，以及docker 的安装流程。
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2023/03/15/Docker-1/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
